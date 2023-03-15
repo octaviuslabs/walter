@@ -1,8 +1,109 @@
 import openai from "./openai";
-import Config from "./config";
-import { Octokit } from "@octokit/rest";
+import octokit from "./gh";
+import * as utils from "./utils";
+import * as je from "./job-interpreter";
 
-const octokit = new Octokit({ auth: Config.githubApiToken });
+export async function generatePseudocodeFromEmbedded(
+  task: string,
+  hist: utils.Message[]
+): Promise<string> {
+  let pmptArray = [];
+  pmptArray.push(
+    //`Write instructions on which files to change and what changes to make to accomplish the following task:\n\n${task}`
+    task
+  );
+
+  const pmpt = pmptArray.join("\n");
+
+  return callChat(pmpt, hist);
+}
+
+const dslInterpreterMsg = [
+  "You are a software development assistant helping to interpret programming tasks to a domain specific language. You can only respond in this domain specific language with the code directly.",
+  "Below is a sample program of in the domain specific language",
+  "```",
+  'in https://github.com/octaviuslabs/walter/blob/main/index.ts#L7: "load this from an environment variable"',
+  'in https://github.com/octaviuslabs/walter/blob/main/main.ts#L7: "change the files read to work asyncrnously"',
+  "```",
+  'Where "in" is the keyword to indicate a new task. "https://github.com/octaviuslabs/walter/blob/main/index.ts#L7" is the target of a specific action to be taken. "load this from an environment variable" is the action that is taken.',
+].join("\n");
+
+async function callChat(pmpt: string, hist: utils.Message[]): Promise<string> {
+  console.log("sending request to chat with prompt", pmpt);
+  const messages = [
+    {
+      role: "system",
+      content:
+        //"You are a software development assistant helping to design step by step architecture using pseudocode for other developers to implement.",
+        dslInterpreterMsg.toString(),
+    },
+    ...hist,
+    { role: "user", content: pmpt },
+  ];
+
+  const res = await openai.createChatCompletion({
+    model: "gpt-3.5-turbo",
+    messages,
+    n: 1,
+    temperature: 0.7,
+  });
+
+  const out = res.data.choices[0].message?.content;
+
+  if (!out) {
+    throw "No response from service";
+  }
+
+  return out;
+}
+
+export async function callEdit(pmpt: string, myInput: string): Promise<string> {
+  console.log("calling edit with", pmpt);
+  const res = await openai.createEdit({
+    model: "code-davinci-edit-001",
+    input: myInput,
+    instruction: pmpt,
+    n: 1,
+    temperature: 0.7,
+  });
+
+  const out = res.data.choices[0].text;
+
+  if (!out) {
+    throw "No response from service";
+  }
+
+  return out;
+}
+
+export interface CodeEdit {
+  fileContent: utils.FileContent;
+  job: je.ExecutionJob;
+  body: string;
+}
+
+export async function createEdit(job: je.ExecutionJob): Promise<CodeEdit> {
+  const fileContent = await utils.getFileFromUrl(job.target);
+  let action = [];
+  // TODO: support end line
+  if (fileContent.parsedUrl.startLine) {
+    action.push(`On line ${fileContent.parsedUrl.startLine}.`);
+  }
+
+  if (fileContent.parsedUrl.endLine) {
+    action.push(`To line ${fileContent.parsedUrl.endLine}.`);
+  }
+
+  action.push("Make the following changes.");
+  action.push(job.action);
+
+  const body = await callEdit(action.join(" "), fileContent.body);
+  return {
+    fileContent,
+    job,
+    body,
+  };
+}
 
 export async function generatePseudocode(
   description: string,
@@ -25,7 +126,7 @@ export async function generatePseudocode(
 
   let pmptArray = [];
   pmptArray.push(
-    `Generate detailed instructions for a junior developer to execute for the following task:\n\n${description}`
+    `Write instructions on which files to change and the pseudocode changes someone needs to submit as a pull request to accompish this task:\n\n${description}`
   );
   if (files.length > 0) {
     pmptArray.push("\n\nRelevant files and lines:\n");
@@ -34,19 +135,9 @@ export async function generatePseudocode(
     );
     pmptArray = pmptArray.concat(fileLinesText);
   }
-  const prompt = pmptArray.join("\n");
+  const pmpt = pmptArray.join("\n");
 
-  console.log("sending request with prompt", prompt);
-  const openaiResponse = await openai.createCompletion({
-    model: "code-davinci-002",
-    prompt,
-    max_tokens: 200,
-    n: 1,
-    stop: null,
-    temperature: 0.7,
-  });
-
-  return openaiResponse.data.choices[0].text || "";
+  return await callChat(pmpt, []);
 }
 
 export async function postComment(
