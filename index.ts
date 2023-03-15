@@ -3,6 +3,9 @@ import express from "express";
 import { generatePseudocode, postComment } from "./psudocode-generator";
 import Config from "./config";
 
+
+// On line 7. Make the following changes. load this from an environment variable
+
 const BOT_NAME = Config.githubBotName;
 const BOT_LABEL = "walter-build";
 
