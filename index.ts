@@ -117,6 +117,7 @@ function extractTaskInfo(issue: any): {
   return { description, files, lines };
 }
 
+// Only log the issue, don't process it
 webhooks.on("issues.opened", async (event: any) => {
   console.log("new issue");
   const issue = event.payload.issue;
