@@ -6,7 +6,7 @@ import Config from "./config";
 const BOT_NAME = Config.githubBotName;
 const BOT_LABEL = "walter-build";
 
-const webhooks = new Webhooks({ secret: Config.githubWebhookSecret });
+const webhooks = new Webhooks({ secret: Config.githubWebhookSecret || process.env.GITHUB_WEBHOOK_SECRET });
 
 function isBotTask(issue: any, repository: string): boolean {
   // Replace 'bot-label' with the label you want to use to identify bot tasks
