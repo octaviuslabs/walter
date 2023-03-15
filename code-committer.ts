@@ -16,7 +16,7 @@ async function generateCode(
   repository: Repository
 ): Promise<string> {
   const response = await openai.createCompletion({
-    model: "davinci-codex",
+    model: "code-davinci-002",
     prompt: `Translate the following pseudocode to JavaScript code:\n\n${pseudocode}`,
     max_tokens: 200,
     n: 1,

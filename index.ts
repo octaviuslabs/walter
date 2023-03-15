@@ -1,15 +1,18 @@
 import { Webhooks, createNodeMiddleware } from "@octokit/webhooks";
 import express from "express";
-import { generatePseudocode, postComment } from "./code-generator";
+import { generatePseudocode, postComment } from "./psudocode-generator";
 import Config from "./config";
 
 const BOT_NAME = Config.githubBotName;
+const BOT_LABEL = "walter-build";
 
 const webhooks = new Webhooks({ secret: Config.githubWebhookSecret });
 
-function isBotTask(issue: any): boolean {
+function isBotTask(issue: any, repository: string): boolean {
   // Replace 'bot-label' with the label you want to use to identify bot tasks
-  const BOT_LABEL = "bot-label";
+  if (repository != "walter") {
+    return false;
+  }
   return issue.labels.some((label: any) => label.name === BOT_LABEL);
 }
 
@@ -41,10 +44,12 @@ function extractTaskInfo(issue: any): {
 }
 
 webhooks.on("issues.opened", async (event: any) => {
+  console.log("new issue");
   const issue = event.payload.issue;
   const repository = event.payload.repository;
 
-  if (isBotTask(issue)) {
+  if (isBotTask(issue, repository.name)) {
+    console.log("Processing issue");
     const taskInfo = extractTaskInfo(issue);
     const pseudocode = await generatePseudocode(
       taskInfo.description,
@@ -66,19 +71,26 @@ webhooks.on("issue_comment.created", async (event: any) => {
   const comment = event.payload.comment;
   const issue = event.payload.issue;
   const repository = event.payload.repository;
+  console.log("new comment", event);
 
-  if (isBotTask(issue)) {
+  if (isBotTask(issue, repository.name)) {
+    console.log("Processing comment");
     const action: CommentAction = parseComment(comment);
+    console.log("Parsed comment", action);
 
     if (action.type === "refine") {
+      console.log("refining", action);
       const updatedPseudocode = await generatePseudocode(
         action.description,
         action.files,
         action.lines,
         repository
       );
+      console.log("generated code", updatedPseudocode);
       await postComment(repository, issue, updatedPseudocode);
+      return;
     } else if (action.type === "approve") {
+      console.log("approved");
       // Proceed to the next step
     }
   }
@@ -94,13 +106,8 @@ function parseComment(comment: any): CommentAction {
     return { type: "approve" };
   }
 
-  const refineMatch = refineRegex.exec(comment.body);
-  if (refineMatch) {
-    const taskInfo = extractTaskInfo({ body: refineMatch[1] });
-    return { type: "refine", ...taskInfo };
-  }
-
-  return { type: "unknown" };
+  const taskInfo = extractTaskInfo({ body: comment.body });
+  return { type: "refine", ...taskInfo };
 }
 
 const middleware = createNodeMiddleware(webhooks, { path: "/webhook" });

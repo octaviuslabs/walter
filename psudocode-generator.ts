@@ -2,7 +2,7 @@ import openai from "./openai";
 import Config from "./config";
 import { Octokit } from "@octokit/rest";
 
-const octokit = new Octokit({ auth: Config });
+const octokit = new Octokit({ auth: Config.githubApiToken });
 
 export async function generatePseudocode(
   description: string,
@@ -23,16 +23,21 @@ export async function generatePseudocode(
     Buffer.from(response.data.content, "base64").toString()
   );
 
-  const prompt = `Generate pseudocode for the following task:\n\n${description}\n\nRelevant files and lines:\n`;
-  const fileLinesText = files
-    .map(
-      (file, index) => `${file}: line ${lines[index]}\n${fileContents[index]}`
-    )
-    .join("\n\n");
+  let prompt = `Generate pseudocode for the following task:\n\n${description}`;
+  if (files.length > 0) {
+    prompt = prompt + "\n\nRelevant files and lines:\n";
+    const fileLinesText = files
+      .map(
+        (file, index) => `${file}: line ${lines[index]}\n${fileContents[index]}`
+      )
+      .join("\n\n");
+    prompt = prompt + fileLinesText;
+  }
 
+  console.log("sending request with prompt", prompt);
   const openaiResponse = await openai.createCompletion({
-    model: "davinci-codex",
-    prompt: prompt + fileLinesText,
+    model: "code-davinci-002",
+    prompt: prompt,
     max_tokens: 200,
     n: 1,
     stop: null,
@@ -47,6 +52,7 @@ export async function postComment(
   issue: any,
   commentBody: string
 ): Promise<void> {
+  console.log("POSTING COMMENT", commentBody);
   await octokit.rest.issues.createComment({
     owner: repository.owner.login,
     repo: repository.name,
