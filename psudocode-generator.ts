@@ -23,21 +23,23 @@ export async function generatePseudocode(
     Buffer.from(response.data.content, "base64").toString()
   );
 
-  let prompt = `Generate pseudocode for the following task:\n\n${description}`;
+  let pmptArray = [];
+  pmptArray.push(
+    `Generate detailed instructions for a junior developer to execute for the following task:\n\n${description}`
+  );
   if (files.length > 0) {
-    prompt = prompt + "\n\nRelevant files and lines:\n";
-    const fileLinesText = files
-      .map(
-        (file, index) => `${file}: line ${lines[index]}\n${fileContents[index]}`
-      )
-      .join("\n\n");
-    prompt = prompt + fileLinesText;
+    pmptArray.push("\n\nRelevant files and lines:\n");
+    const fileLinesText = files.map(
+      (file, index) => `${file}: line ${lines[index]}\n${fileContents[index]}`
+    );
+    pmptArray = pmptArray.concat(fileLinesText);
   }
+  const prompt = pmptArray.join("\n");
 
   console.log("sending request with prompt", prompt);
   const openaiResponse = await openai.createCompletion({
     model: "code-davinci-002",
-    prompt: prompt,
+    prompt,
     max_tokens: 200,
     n: 1,
     stop: null,
