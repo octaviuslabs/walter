@@ -120,6 +120,8 @@ function extractTaskInfo(issue: any): {
 webhooks.on("issues.opened", async (event: any) => {
   console.log("new issue");
   const issue = event.payload.issue;
+  console.log("issue", issue);
+  return;
   const repository = event.payload.repository;
 
   if (isBotTask(issue, repository.name)) {
