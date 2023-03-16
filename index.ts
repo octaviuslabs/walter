@@ -18,7 +18,7 @@ const webhooks = new Webhooks({ secret: Config.githubWebhookSecret });
 
 function isBotTask(issue: any, repository: string): boolean {
   // Replace 'bot-label' with the label you want to use to identify bot tasks
-  if (repository != "walter") {
+  if (repository !== "walter") {
     return false;
   }
   return issue.labels.some((label: any) => label.name === BOT_LABEL);
