@@ -148,7 +148,6 @@ webhooks.on("issue_comment.created", async (event: any) => {
 
     if (action.type === "refine") {
       // TODO: get history
-      const hist: any = []; //await utils.getCommentHistory(repository, issue.number);
 
       const jobs = parseCommentForJobs(action.body);
       console.log("jobs", jobs);
