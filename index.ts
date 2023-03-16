@@ -146,7 +146,7 @@ webhooks.on("issue_comment.created", async (event: any) => {
     const action: CommentAction = parseComment(comment);
     console.log("Parsed comment", action);
 
-    if (action.type === "refine") {
+    if (action.type === "refine") { 
       // TODO: get history
       const hist: any = []; //await utils.getCommentHistory(repository, issue.number);
 
