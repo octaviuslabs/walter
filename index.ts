@@ -1,6 +1,6 @@
 import { Webhooks, createNodeMiddleware } from "@octokit/webhooks";
 import express from "express";
-import {
+import winston, {
   generatePseudocodeFromEmbedded,
   postComment,
   createEdit,
