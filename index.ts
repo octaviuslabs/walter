@@ -125,6 +125,7 @@ webhooks.on("issues.opened", async (event: any) => {
   if (isBotTask(issue, repository.name)) {
     console.log("Processing issue", issue);
     const taskInfo = await extractTaskInfoAndEmbed(issue);
+    return;
     const pseudocode = await generatePseudocodeFromEmbedded(taskInfo, []);
     await postComment(repository, issue, pseudocode);
   }
