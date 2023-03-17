@@ -1,3 +1,5 @@
+```typescript
+// /index.ts
 import { Webhooks, createNodeMiddleware } from "@octokit/webhooks";
 import express from "express";
 import {
@@ -10,6 +12,19 @@ import Config from "./config";
 import octokit from "./gh";
 import * as utils from "./utils";
 import { parseCommentForJobs } from "./job-interpreter";
+import winston from "winston";
+
+const logger = winston.createLogger({
+  level: "info",
+  format: winston.format.combine(
+    winston.format.colorize(),
+    winston.format.timestamp(),
+    winston.format.printf(({ timestamp, level, message }) => {
+      return `[${timestamp}] ${level}: ${message}`;
+    })
+  ),
+  transports: [new winston.transports.Console()],
+});
 
 const BOT_NAME = Config.githubBotName;
 const BOT_LABEL = "walter-build";
@@ -32,9 +47,9 @@ export async function extractTaskInfoAndEmbed(
 
   let description = issueBody;
 
-  console.log("issue body", issueBody);
+  logger.log("info", "issue body", issueBody);
   const matches = githubUrlRegex.exec(issueBody);
-  console.log(matches);
+  logger.log("info", matches);
 
   const files: { link: string; snippit: string }[] = [];
 
@@ -45,7 +60,7 @@ export async function extractTaskInfoAndEmbed(
   for (let i = 0; i < matches.length; i++) {
     const match = matches[i];
     const parsedUrl = utils.parseGitHubURL(match);
-    console.log(parsedUrl);
+    logger.log("info", parsedUrl);
 
     if (!parsedUrl) continue;
 
@@ -62,7 +77,7 @@ export async function extractTaskInfoAndEmbed(
         "base64"
       ).toString();
 
-      console.log("file contents", fileContent);
+      logger.log("info", "file contents", fileContent);
 
       files.push({
         link: match,
@@ -83,7 +98,7 @@ export async function extractTaskInfoAndEmbed(
       //`File: ${parsedUrl.filePath} (branch: ${parsedUrl.branch})\n\nContent:\n${fileContentSnippet}\n`
       //);
     } catch (err: any) {
-      console.error(`Error fetching file content from GitHub: ${err.message}`);
+      logger.error(`Error fetching file content from GitHub: ${err.message}`);
     }
   }
 
@@ -118,12 +133,12 @@ function extractTaskInfo(issue: any): {
 }
 
 webhooks.on("issues.opened", async (event: any) => {
-  console.log("new issue");
+  logger.log("info", "new issue");
   const issue = event.payload.issue;
   const repository = event.payload.repository;
 
   if (isBotTask(issue, repository.name)) {
-    console.log("Processing issue", issue);
+    logger.log("info", "Processing issue", issue);
     const taskInfo = await extractTaskInfoAndEmbed(issue);
     const pseudocode = await generatePseudocodeFromEmbedded(taskInfo, []);
     await postComment(repository, issue, pseudocode);
@@ -142,16 +157,16 @@ webhooks.on("issue_comment.created", async (event: any) => {
   const repository = event.payload.repository;
 
   if (isBotTask(issue, repository.name) && comment.user.login != BOT_NAME) {
-    console.log("Processing comment", comment, "on", issue);
+    logger.log("info", "Processing comment", comment, "on", issue);
     const action: CommentAction = parseComment(comment);
-    console.log("Parsed comment", action);
+    logger.log("info", "Parsed comment", action);
 
     if (action.type === "refine") {
       // TODO: get history
       const hist: any = []; //await utils.getCommentHistory(repository, issue.number);
 
       const jobs = parseCommentForJobs(action.body);
-      console.log("jobs", jobs);
+      logger.log("info", "jobs", jobs);
 
       if (jobs.length > 0) {
         const res = await Promise.all(jobs.map(createEdit));
@@ -159,7 +174,7 @@ webhooks.on("issue_comment.created", async (event: any) => {
       }
       return;
     } else if (action.type === "approve") {
-      console.log("approved");
+      logger.log("info", "approved");
       const hist = await utils.getCommentHistory(repository, issue.number);
       const previousDevMsgs = hist.filter((v) => {
         return v.role == "developer";
@@ -209,4 +224,6 @@ const app = express();
 app.use(middleware);
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server listening on port ${PORT}`));
+app.listen(PORT, () => logger.log("info", `Server listening on port ${PORT}`));
+
+```
