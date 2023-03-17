@@ -13,11 +13,9 @@ import { parseCommentForJobs } from "./job-interpreter";
 
 const BOT_NAME = Config.githubBotName;
 const BOT_LABEL = "walter-build";
-
 const webhooks = new Webhooks({ secret: Config.githubWebhookSecret });
 
 function isBotTask(issue: any, repository: string): boolean {
-  // Replace 'bot-label' with the label you want to use to identify bot tasks
   if (repository != "walter") {
     return false;
   }
@@ -30,22 +28,15 @@ export async function extractTaskInfoAndEmbed(
   const githubUrlRegex =
     /(https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|www\.[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9]+\.[^\s]{2,}|www\.[a-zA-Z0-9]+\.[^\s]{2,})/;
 
-  let description = issueBody;
-
-  console.log("issue body", issueBody);
-  const matches = githubUrlRegex.exec(issueBody);
-  console.log(matches);
-
   const files: { link: string; snippit: string }[] = [];
+  const matches = githubUrlRegex.exec(issueBody);
 
-  if (matches == null) {
-    return description;
+  if (matches === null) {
+    return issueBody.trim();
   }
 
-  for (let i = 0; i < matches.length; i++) {
-    const match = matches[i];
+  for (const match of matches) {
     const parsedUrl = utils.parseGitHubURL(match);
-    console.log(parsedUrl);
 
     if (!parsedUrl) continue;
 
@@ -62,68 +53,23 @@ export async function extractTaskInfoAndEmbed(
         "base64"
       ).toString();
 
-      console.log("file contents", fileContent);
-
       files.push({
         link: match,
         snippit: fileContent,
       });
-
-      //let fileContentSnippet = fileContent;
-
-      //if (parsedUrl.startLine) {
-      //const lines = fileContent.split("\n");
-      //const selectedLine = lines[parsedUrl.startLine - 1] || "";
-      //fileContentSnippet = `Line ${parsedUrl.startLine}: ${selectedLine}`;
-      //}
-
-      //const fileURL = match[0];
-      //description = description.replace(
-      //fileURL,
-      //`File: ${parsedUrl.filePath} (branch: ${parsedUrl.branch})\n\nContent:\n${fileContentSnippet}\n`
-      //);
     } catch (err: any) {
       console.error(`Error fetching file content from GitHub: ${err.message}`);
     }
   }
 
-  return description.trim();
-}
-
-function extractTaskInfo(issue: any): {
-  description: string;
-  files: string[];
-  lines: number[];
-} {
-  const description = issue.body;
-  const fileRegex = /file:\s*([\w./-]+)/gi;
-  const lineRegex = /line:\s*(\d+)/gi;
-
-  const files: string[] = [];
-  const lines: number[] = [];
-
-  let fileMatch = fileRegex.exec(description);
-  while (fileMatch) {
-    files.push(fileMatch[1]);
-    fileMatch = fileRegex.exec(description);
-  }
-
-  let lineMatch = lineRegex.exec(description);
-  while (lineMatch) {
-    lines.push(parseInt(lineMatch[1], 10));
-    lineMatch = lineRegex.exec(description);
-  }
-
-  return { description, files, lines };
+  return issueBody.trim();
 }
 
 webhooks.on("issues.opened", async (event: any) => {
-  console.log("new issue");
   const issue = event.payload.issue;
   const repository = event.payload.repository;
 
   if (isBotTask(issue, repository.name)) {
-    console.log("Processing issue", issue);
     const taskInfo = await extractTaskInfoAndEmbed(issue);
     const pseudocode = await generatePseudocodeFromEmbedded(taskInfo, []);
     await postComment(repository, issue, pseudocode);
@@ -135,23 +81,16 @@ type CommentAction =
   | { type: "refine"; body: string; files?: string[]; lines?: number[] }
   | { type: "approve" };
 
-// Add a webhook handler for "issue_comment" event
 webhooks.on("issue_comment.created", async (event: any) => {
   const comment = event.payload.comment;
   const issue = event.payload.issue;
   const repository = event.payload.repository;
 
   if (isBotTask(issue, repository.name) && comment.user.login != BOT_NAME) {
-    console.log("Processing comment", comment, "on", issue);
     const action: CommentAction = parseComment(comment);
-    console.log("Parsed comment", action);
 
     if (action.type === "refine") {
-      // TODO: get history
-      const hist: any = []; //await utils.getCommentHistory(repository, issue.number);
-
       const jobs = parseCommentForJobs(action.body);
-      console.log("jobs", jobs);
 
       if (jobs.length > 0) {
         const res = await Promise.all(jobs.map(createEdit));
@@ -159,7 +98,6 @@ webhooks.on("issue_comment.created", async (event: any) => {
       }
       return;
     } else if (action.type === "approve") {
-      console.log("approved");
       const hist = await utils.getCommentHistory(repository, issue.number);
       const previousDevMsgs = hist.filter((v) => {
         return v.role == "developer";
@@ -181,8 +119,6 @@ webhooks.on("issue_comment.created", async (event: any) => {
 });
 
 function parseComment(comment: any): CommentAction {
-  // Check if the comment is for refining the plan or approving it
-  // Adjust the regex and keywords as needed
   const refineRegex = /refine\s*:\s*(.+)/i;
   const approveRegex = new RegExp(`@${BOT_NAME}\\s*APPROVED`, "i");
 
@@ -191,16 +127,6 @@ function parseComment(comment: any): CommentAction {
   }
 
   return { type: "refine", body: comment.body };
-}
-
-async function parseCommentWithEmbedded(comment: any): Promise<CommentAction> {
-  const myParsed = parseComment(comment);
-  if (myParsed.type != "refine") {
-    return myParsed;
-  }
-
-  const taskInfo = await extractTaskInfoAndEmbed(myParsed.body as string);
-  return { type: "refine", body: taskInfo };
 }
 
 const middleware = createNodeMiddleware(webhooks, { path: "/webhook" });
