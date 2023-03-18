@@ -168,6 +168,11 @@ webhooks.on("issue_comment.created", async (event: any) => {
   }
 });
 
+webhooks.on("pull_request_review_comment.created", async (event: any) => {
+  const comment = event.payload.comment;
+  winston.log("info", "Pull request comment body:", comment.body);
+});
+
 function parseComment(comment: any): CommentAction {
   const refineRegex = /refine\s*:\s*(.+)/i;
   const approveRegex = new RegExp(`@${BOT_NAME}\\s*APPROVED`, "i");
