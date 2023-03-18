@@ -114,7 +114,13 @@ type CommentAction =
   | { type: "approve" }
   | { type: "design"; body: string };
 
+const eventQueue: any[] = [];
+
 webhooks.on("issue_comment.created", async (event: any) => {
+  eventQueue.push(event);
+});
+
+async function processEvent(event: any) {
   const comment = event.payload.comment;
   const issue = event.payload.issue;
   const repository = event.payload.repository;
@@ -166,7 +172,7 @@ webhooks.on("issue_comment.created", async (event: any) => {
   } else {
     winston.log("info", "Ignoring comment");
   }
-});
+}
 
 webhooks.on("pull_request_review_comment.created", async (event: any) => {
   const comment = event.payload.comment;
@@ -210,3 +216,10 @@ app.use(middleware);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => winston.log("info", `Server listening on port ${PORT}`));
+
+setInterval(() => {
+  if (eventQueue.length > 0) {
+    const event = eventQueue.shift();
+    processEvent(event);
+  }
+}, 1000);
