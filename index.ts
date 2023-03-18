@@ -150,7 +150,7 @@ async function processEvent(event: any) {
     postComment(
       event.payload.repository,
       event.payload.issue,
-      [`> ${comment.body} `, "Processing"].join("\n")
+      [`> ${comment.body} `, "Processing this now"].join("\n\n")
     );
     //winston.log("info", "Processing comment", comment, "on", issue);
     const action: CommentAction = parseComment(comment);
