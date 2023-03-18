@@ -217,9 +217,11 @@ app.use(middleware);
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => winston.log("info", `Server listening on port ${PORT}`));
 
-setInterval(() => {
-  if (eventQueue.length > 0) {
-    const event = eventQueue.shift();
-    processEvent(event);
+(async function processEvents() {
+  while (true) {
+    if (eventQueue.length > 0) {
+      const event = eventQueue.shift();
+      await processEvent(event);
+    }
   }
-}, 1000);
+})();
