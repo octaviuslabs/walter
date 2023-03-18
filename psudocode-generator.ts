@@ -105,7 +105,7 @@ const saveInteraction = async function (
 
 export function extractCodeFromResponse(res: string): string[] {
   console.log("extracting code from message");
-  const diffCodeBlockRegex = /```code([\s\S]*?)```/g;
+  const diffCodeBlockRegex = /```(?:\w+\n)?([\s\S]*?)```/g;
   const codeBlocks: string[] = [];
   let match: RegExpExecArray | null;
 

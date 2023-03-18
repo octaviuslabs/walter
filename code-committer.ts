@@ -1,4 +1,3 @@
-typescript
 import openai from "./openai";
 import octokit from "./gh";
 import * as psg from "./psudocode-generator";
@@ -186,3 +185,4 @@ async function getFileFromPullRequestComment(
 }
 
 export { getFileFromPullRequestComment };
+

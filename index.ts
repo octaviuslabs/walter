@@ -118,6 +118,7 @@ type CommentAction =
 
 webhooks.on("issue_comment.created", async (event: any) => {
   await queue.push(event);
+  postComment(event.payload.repository, event.payload.issue, "Processing...");
 });
 
 async function processEvent(event: any) {
@@ -216,4 +217,3 @@ app.use(middleware);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => winston.log("info", `Server listening on port ${PORT}`));
-
