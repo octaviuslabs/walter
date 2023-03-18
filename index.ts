@@ -118,7 +118,8 @@ type CommentAction =
   | { type: "unknown" }
   | { type: "refine"; body: string; files?: string[]; lines?: number[] }
   | { type: "approve" }
-  | { type: "design"; body: string };
+  | { type: "design"; body: string }
+  | { type: "retry" };
 
 webhooks.on("issue_comment.created", async (event: any) => {
   const comment = event.payload.comment;
@@ -188,6 +189,8 @@ async function processEvent(event: any) {
         winston.log("info", "processing complete");
       } else if (action.type === "design") {
         processDesignAction(action.body);
+      } else if (action.type === "retry") {
+        winston.log("info", "Retrying");
       }
     } catch (err) {
       winston.log("error", "ERROR", err);
@@ -207,6 +210,7 @@ function parseComment(comment: any): CommentAction {
   const refineRegex = /refine\s*:\s*(.+)/i;
   const approveRegex = new RegExp(`@${BOT_NAME}\\s*APPROVED`, "i");
   const designRegex = /design\s*:\s*(.+)/i;
+  const retryRegex = new RegExp(`@${BOT_NAME}\\s*RETRY`, "i");
 
   if (approveRegex.test(comment.body)) {
     return { type: "approve" };
@@ -214,6 +218,10 @@ function parseComment(comment: any): CommentAction {
 
   if (designRegex.test(comment.body)) {
     return { type: "design", body: comment.body };
+  }
+
+  if (retryRegex.test(comment.body)) {
+    return { type: "retry" };
   }
 
   return { type: "refine", body: comment.body };
