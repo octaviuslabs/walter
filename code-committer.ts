@@ -1,3 +1,4 @@
+typescript
 import openai from "./openai";
 import octokit from "./gh";
 import * as psg from "./psudocode-generator";
@@ -29,15 +30,6 @@ async function generateCode(
     temperature: 0.7,
   });
 
-  //const response = await openai.createCompletion({
-  //model: "code-davinci-002",
-  //prompt: pmpt,
-  //max_tokens: 200,
-  //n: 1,
-  //stop: null,
-  //temperature: 0.7,
-  //});
-  //
   if (res.data.choices[0].message?.content == undefined) {
     throw "No response";
   }
@@ -82,8 +74,6 @@ async function commitCode(
     };
   });
 
-  //console.log("creating file", files);
-
   const treeItems = files.map((file) => ({
     path: file.path,
     mode: "100644" as any,
@@ -96,9 +86,7 @@ async function commitCode(
     repo: repository.name,
     ref: `heads/${branch}`,
   });
-  //console.log("refs", myRef);
 
-  //console.log("createTree");
   const tree = await octokit.rest.git.createTree({
     owner: repository.owner.login,
     repo: repository.name,
@@ -106,9 +94,7 @@ async function commitCode(
     ref: myRef.data.object.sha,
     base_tree: myRef.data.object.sha,
   });
-  //console.log("tree", tree);
 
-  //console.log("createCommit");
   const commit = await octokit.rest.git.createCommit({
     owner: repository.owner.login,
     repo: repository.name,
@@ -117,17 +103,12 @@ async function commitCode(
     parents: [myRef.data.object.sha],
   });
 
-  //console.log("commit", commit);
-
-  //console.log("updateRef");
-
   const refProps = {
     owner: repository.owner.login,
     repo: repository.name,
     ref: `heads/${branch}`,
     sha: commit.data.sha,
   };
-  //console.log(refProps);
   await octokit.rest.git.updateRef(refProps);
 }
 
@@ -177,14 +158,31 @@ async function handleCodeGeneration(
   const code = await generateCode(pseudocode, repository);
 
   const newBranch = await createBranch(repository);
-  //console.log("comitting");
-  //await commitCode(repository, newBranch, code);
-  //console.log("committed");
   const pullRequest = await createPullRequest(repository, newBranch);
-  //console.log("pull request opened");
-  //console.log(pullRequest);
 
   return pullRequest;
 }
 
 export { handleCodeGeneration };
+
+async function getFileFromPullRequestComment(
+  repository: Repository,
+  commentId: number
+): Promise<any> {
+  const comment = await octokit.rest.pulls.getReviewComment({
+    owner: repository.owner.login,
+    repo: repository.name,
+    comment_id: commentId,
+  });
+
+  const file = await octokit.rest.repos.getContent({
+    owner: repository.owner.login,
+    repo: repository.name,
+    path: comment.data.path,
+    ref: comment.data.commit_id,
+  });
+
+  return file.data;
+}
+
+export { getFileFromPullRequestComment };
