@@ -12,10 +12,12 @@ import octokit from "./gh";
 import * as utils from "./utils";
 import { parseCommentForJobs } from "./job-interpreter";
 import winston from "./log";
+import fastq from "fastq";
 
 const BOT_NAME = Config.githubBotName;
 const BOT_LABEL = "walter-build";
 
+const queue = fastq.promise(processEvent, 1);
 const webhooks = new Webhooks({ secret: Config.githubWebhookSecret });
 
 function isBotTask(issue: any, repository: string, user: string): boolean {
@@ -114,10 +116,8 @@ type CommentAction =
   | { type: "approve" }
   | { type: "design"; body: string };
 
-const eventQueue: any[] = [];
-
 webhooks.on("issue_comment.created", async (event: any) => {
-  eventQueue.push(event);
+  await queue.push(event);
 });
 
 async function processEvent(event: any) {
@@ -217,11 +217,3 @@ app.use(middleware);
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => winston.log("info", `Server listening on port ${PORT}`));
 
-(async function processEvents() {
-  while (true) {
-    if (eventQueue.length > 0) {
-      const event = eventQueue.shift();
-      await processEvent(event);
-    }
-  }
-})();
