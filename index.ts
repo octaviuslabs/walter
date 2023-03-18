@@ -6,7 +6,11 @@ import {
   createEdit,
   createEditWithChat,
 } from "./psudocode-generator";
-import { handleCodeGeneration, createNewPullRequest } from "./code-committer";
+import {
+  getFileFromPullRequestComment,
+  handleCodeGeneration,
+  createNewPullRequest,
+} from "./code-committer";
 import Config from "./config";
 import octokit from "./gh";
 import * as utils from "./utils";
@@ -178,6 +182,7 @@ async function processEvent(event: any) {
 webhooks.on("pull_request_review_comment.created", async (event: any) => {
   const comment = event.payload.comment;
   winston.log("info", "Pull request comment body:", comment.body);
+  //getFileFromPullRequestComment(repository, commentId)
 });
 
 function parseComment(comment: any): CommentAction {
