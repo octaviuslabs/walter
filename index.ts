@@ -11,6 +11,7 @@ import Config from "./config";
 import octokit from "./gh";
 import * as utils from "./utils";
 import { parseCommentForJobs } from "./job-interpreter";
+import winston from "winston";
 
 const BOT_NAME = Config.githubBotName;
 const BOT_LABEL = "walter-build";
@@ -46,7 +47,7 @@ export async function extractTaskInfoAndEmbed(
   for (let i = 0; i < matches.length; i++) {
     const match = matches[i];
     const parsedUrl = utils.parseGitHubURL(match);
-    console.log(parsedUrl);
+    winston.log("info", parsedUrl);
 
     if (!parsedUrl) continue;
 
@@ -63,28 +64,15 @@ export async function extractTaskInfoAndEmbed(
         "base64"
       ).toString();
 
-      console.log("file contents", fileContent);
+      winston.log("info", "file contents", fileContent);
 
       files.push({
         link: match,
         snippit: fileContent,
       });
 
-      //let fileContentSnippet = fileContent;
-
-      //if (parsedUrl.startLine) {
-      //const lines = fileContent.split("\n");
-      //const selectedLine = lines[parsedUrl.startLine - 1] || "";
-      //fileContentSnippet = `Line ${parsedUrl.startLine}: ${selectedLine}`;
-      //}
-
-      //const fileURL = match[0];
-      //description = description.replace(
-      //fileURL,
-      //`File: ${parsedUrl.filePath} (branch: ${parsedUrl.branch})\n\nContent:\n${fileContentSnippet}\n`
-      //);
     } catch (err: any) {
-      console.error(`Error fetching file content from GitHub: ${err.message}`);
+      winston.log("error", `Error fetching file content from GitHub: ${err.message}`);
     }
   }
 
@@ -123,7 +111,6 @@ type CommentAction =
   | { type: "refine"; body: string; files?: string[]; lines?: number[] }
   | { type: "approve" };
 
-// Add a webhook handler for "issue_comment" event
 webhooks.on("issue_comment.created", async (event: any) => {
   const comment = event.payload.comment;
   const issue = event.payload.issue;
@@ -133,17 +120,15 @@ webhooks.on("issue_comment.created", async (event: any) => {
     isBotTask(issue, repository.full_name, comment.user.name) &&
     comment.user.login != BOT_NAME
   ) {
-    console.log("Processing comment", comment, "on", issue);
+    winston.log("info", "Processing comment", comment, "on", issue);
     const action: CommentAction = parseComment(comment);
-    console.log("Parsed comment", action);
+    winston.log("info", "Parsed comment", action);
 
     try {
       if (action.type === "refine") {
-        // TODO: get history
-        const hist: any = []; //await utils.getCommentHistory(repository, issue.number);
-
+        const hist: any = [];
         const jobs = parseCommentForJobs(action.body);
-        console.log("jobs", jobs);
+        winston.log("info", "jobs", jobs);
 
         if (jobs.length > 0) {
           const res = await Promise.all(jobs.map(createEditWithChat));
@@ -151,7 +136,7 @@ webhooks.on("issue_comment.created", async (event: any) => {
         }
         return;
       } else if (action.type === "approve") {
-        console.log("approved");
+        winston.log("info", "approved");
         const hist = await utils.getCommentHistory(repository, issue.number);
         const previousDevMsgs = hist.filter((v) => {
           return v.role == "developer";
@@ -168,19 +153,17 @@ webhooks.on("issue_comment.created", async (event: any) => {
           repository,
           Config.githubBotName
         );
-        console.log("processing complete");
+        winston.log("info", "processing complete");
       }
     } catch (err) {
-      console.log("ERROR", err);
+      winston.log("error", "ERROR", err);
     }
   } else {
-    console.log("Ignoring comment");
+    winston.log("info", "Ignoring comment");
   }
 });
 
 function parseComment(comment: any): CommentAction {
-  // Check if the comment is for refining the plan or approving it
-  // Adjust the regex and keywords as needed
   const refineRegex = /refine\s*:\s*(.+)/i;
   const approveRegex = new RegExp(`@${BOT_NAME}\\s*APPROVED`, "i");
 
@@ -207,4 +190,4 @@ const app = express();
 app.use(middleware);
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server listening on port ${PORT}`));
+app.listen(PORT, () => winston.log("info", `Server listening on port ${PORT}`));
