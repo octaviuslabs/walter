@@ -10,6 +10,7 @@ import Config from "./config";
 import octokit from "./gh";
 import * as utils from "./utils";
 import { parseCommentForJobs } from "./job-interpreter";
+import winston from "winston";
 
 const BOT_NAME = Config.githubBotName;
 const BOT_LABEL = "walter-build";
@@ -32,9 +33,9 @@ export async function extractTaskInfoAndEmbed(
 
   let description = issueBody;
 
-  console.log("issue body", issueBody);
+  winston.info("issue body", issueBody);
   const matches = githubUrlRegex.exec(issueBody);
-  console.log(matches);
+  winston.info(matches);
 
   const files: { link: string; snippit: string }[] = [];
 
@@ -45,7 +46,7 @@ export async function extractTaskInfoAndEmbed(
   for (let i = 0; i < matches.length; i++) {
     const match = matches[i];
     const parsedUrl = utils.parseGitHubURL(match);
-    console.log(parsedUrl);
+    winston.info(parsedUrl);
 
     if (!parsedUrl) continue;
 
@@ -62,28 +63,14 @@ export async function extractTaskInfoAndEmbed(
         "base64"
       ).toString();
 
-      console.log("file contents", fileContent);
+      winston.info("file contents", fileContent);
 
       files.push({
         link: match,
         snippit: fileContent,
       });
-
-      //let fileContentSnippet = fileContent;
-
-      //if (parsedUrl.startLine) {
-      //const lines = fileContent.split("\n");
-      //const selectedLine = lines[parsedUrl.startLine - 1] || "";
-      //fileContentSnippet = `Line ${parsedUrl.startLine}: ${selectedLine}`;
-      //}
-
-      //const fileURL = match[0];
-      //description = description.replace(
-      //fileURL,
-      //`File: ${parsedUrl.filePath} (branch: ${parsedUrl.branch})\n\nContent:\n${fileContentSnippet}\n`
-      //);
     } catch (err: any) {
-      console.error(`Error fetching file content from GitHub: ${err.message}`);
+      winston.error(`Error fetching file content from GitHub: ${err.message}`);
     }
   }
 
@@ -118,12 +105,12 @@ function extractTaskInfo(issue: any): {
 }
 
 webhooks.on("issues.opened", async (event: any) => {
-  console.log("new issue");
+  winston.info("new issue");
   const issue = event.payload.issue;
   const repository = event.payload.repository;
 
   if (isBotTask(issue, repository.name)) {
-    console.log("Processing issue", issue);
+    winston.info("Processing issue", issue);
     const taskInfo = await extractTaskInfoAndEmbed(issue);
     const pseudocode = await generatePseudocodeFromEmbedded(taskInfo, []);
     await postComment(repository, issue, pseudocode);
@@ -142,16 +129,16 @@ webhooks.on("issue_comment.created", async (event: any) => {
   const repository = event.payload.repository;
 
   if (isBotTask(issue, repository.name) && comment.user.login != BOT_NAME) {
-    console.log("Processing comment", comment, "on", issue);
+    winston.info("Processing comment", comment, "on", issue);
     const action: CommentAction = parseComment(comment);
-    console.log("Parsed comment", action);
+    winston.info("Parsed comment", action);
 
     if (action.type === "refine") {
       // TODO: get history
       const hist: any = []; //await utils.getCommentHistory(repository, issue.number);
 
       const jobs = parseCommentForJobs(action.body);
-      console.log("jobs", jobs);
+      winston.info("jobs", jobs);
 
       if (jobs.length > 0) {
         const res = await Promise.all(jobs.map(createEdit));
@@ -159,7 +146,7 @@ webhooks.on("issue_comment.created", async (event: any) => {
       }
       return;
     } else if (action.type === "approve") {
-      console.log("approved");
+      winston.info("approved");
       const hist = await utils.getCommentHistory(repository, issue.number);
       const previousDevMsgs = hist.filter((v) => {
         return v.role == "developer";
@@ -209,4 +196,4 @@ const app = express();
 app.use(middleware);
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server listening on port ${PORT}`));
+app.listen(PORT, () => winston.info(`Server listening on port ${PORT}`));
