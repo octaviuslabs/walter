@@ -17,7 +17,7 @@ const lexer = moo.compile({
 });
 
 export function parseCommentForJobs(program: string): ExecutionJob[] {
-  console.log("lexing", program);
+  //console.log("lexing", program);
   lexer.reset(program);
 
   const executionJobs: ExecutionJob[] = [];

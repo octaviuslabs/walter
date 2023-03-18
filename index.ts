@@ -121,8 +121,21 @@ type CommentAction =
   | { type: "design"; body: string };
 
 webhooks.on("issue_comment.created", async (event: any) => {
-  await queue.push(event);
-  postComment(event.payload.repository, event.payload.issue, "Processing...");
+  const comment = event.payload.comment;
+  const issue = event.payload.issue;
+  const repository = event.payload.repository;
+
+  if (
+    isBotTask(issue, repository.full_name, comment.user.name) &&
+    comment.user.login != BOT_NAME
+  ) {
+    queue.push(event);
+    await postComment(
+      event.payload.repository,
+      event.payload.issue,
+      "Queued for processing..."
+    );
+  }
 });
 
 async function processEvent(event: any) {
@@ -134,7 +147,12 @@ async function processEvent(event: any) {
     isBotTask(issue, repository.full_name, comment.user.name) &&
     comment.user.login != BOT_NAME
   ) {
-    winston.log("info", "Processing comment", comment, "on", issue);
+    postComment(
+      event.payload.repository,
+      event.payload.issue,
+      [`> ${comment.body} `, "Processing"].join("\n")
+    );
+    //winston.log("info", "Processing comment", comment, "on", issue);
     const action: CommentAction = parseComment(comment);
     winston.log("info", "Parsed comment", action);
 

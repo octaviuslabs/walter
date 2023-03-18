@@ -45,8 +45,8 @@ async function callChat(
   hist: utils.Message[]
 ): Promise<string> {
   const t0 = Date.now();
-  console.log("sending request to chat with prompt");
-  console.log(pmpt);
+  //console.log("sending request to chat with prompt");
+  //console.log(pmpt);
   const messages = [
     {
       role: "system",
