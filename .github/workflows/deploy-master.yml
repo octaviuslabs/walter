@@ -1,7 +1,7 @@
 name: Deploy Master (Prod)
 on:
   push:
-    branches: [master]
+    branches: ["main"]
 
 jobs:
   deploy:
