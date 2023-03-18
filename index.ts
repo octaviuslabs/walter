@@ -111,7 +111,8 @@ function extractTaskInfo(issue: any): {
 type CommentAction =
   | { type: "unknown" }
   | { type: "refine"; body: string; files?: string[]; lines?: number[] }
-  | { type: "approve" };
+  | { type: "approve" }
+  | { type: "design"; body: string };
 
 webhooks.on("issue_comment.created", async (event: any) => {
   const comment = event.payload.comment;
@@ -156,6 +157,8 @@ webhooks.on("issue_comment.created", async (event: any) => {
           Config.githubBotName
         );
         winston.log("info", "processing complete");
+      } else if (action.type === "design") {
+        processDesignAction(action.body);
       }
     } catch (err) {
       winston.log("error", "ERROR", err);
@@ -168,9 +171,14 @@ webhooks.on("issue_comment.created", async (event: any) => {
 function parseComment(comment: any): CommentAction {
   const refineRegex = /refine\s*:\s*(.+)/i;
   const approveRegex = new RegExp(`@${BOT_NAME}\\s*APPROVED`, "i");
+  const designRegex = /design\s*:\s*(.+)/i;
 
   if (approveRegex.test(comment.body)) {
     return { type: "approve" };
+  }
+
+  if (designRegex.test(comment.body)) {
+    return { type: "design", body: comment.body };
   }
 
   return { type: "refine", body: comment.body };
@@ -186,6 +194,10 @@ async function parseCommentWithEmbedded(comment: any): Promise<CommentAction> {
   return { type: "refine", body: taskInfo };
 }
 
+function processDesignAction(commentBody: string) {
+  winston.log("info", `Design action comment body: ${commentBody}`);
+}
+
 const middleware = createNodeMiddleware(webhooks, { path: "/webhook" });
 
 const app = express();
@@ -193,4 +205,3 @@ app.use(middleware);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => winston.log("info", `Server listening on port ${PORT}`));
-
