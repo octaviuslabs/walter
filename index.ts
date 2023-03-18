@@ -11,7 +11,7 @@ import Config from "./config";
 import octokit from "./gh";
 import * as utils from "./utils";
 import { parseCommentForJobs } from "./job-interpreter";
-import winston from "winston";
+import winston from "./log";
 
 const BOT_NAME = Config.githubBotName;
 const BOT_LABEL = "walter-build";
@@ -70,9 +70,11 @@ export async function extractTaskInfoAndEmbed(
         link: match,
         snippit: fileContent,
       });
-
     } catch (err: any) {
-      winston.log("error", `Error fetching file content from GitHub: ${err.message}`);
+      winston.log(
+        "error",
+        `Error fetching file content from GitHub: ${err.message}`
+      );
     }
   }
 
@@ -191,3 +193,4 @@ app.use(middleware);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => winston.log("info", `Server listening on port ${PORT}`));
+
