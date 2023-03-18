@@ -2,6 +2,26 @@ import openai from "./openai";
 import octokit from "./gh";
 import * as utils from "./utils";
 import * as je from "./job-interpreter";
+import DMP from "diff-match-patch";
+import fs from "fs";
+import path from "path";
+import * as Diff from "diff";
+import { v4 as uuidv4 } from "uuid";
+
+const SAVE_INTERACTION = true;
+
+const dmp = new DMP.diff_match_patch();
+
+const systemMessages = {
+  diffGenerator: fs.readFileSync(
+    path.join(__dirname, "system-messages", "diff-generator.md"),
+    "utf8"
+  ),
+  codeGenerator: fs.readFileSync(
+    path.join(__dirname, "system-messages", "code-generator.md"),
+    "utf8"
+  ),
+};
 
 export async function generatePseudocodeFromEmbedded(
   task: string,
@@ -15,40 +35,38 @@ export async function generatePseudocodeFromEmbedded(
 
   const pmpt = pmptArray.join("\n");
 
-  return callChat(pmpt, hist);
+  return callChat(uuidv4(), pmpt, hist);
 }
 
-const dslInterpreterMsg = [
-  "You are a software development assistant helping to interpret programming tasks to a domain specific language. You can only respond in this domain specific language with the code directly.",
-  "Below is a sample program of in the domain specific language",
-  "```",
-  'in https://github.com/octaviuslabs/walter/blob/main/index.ts#L7: "load this from an environment variable"',
-  'in https://github.com/octaviuslabs/walter/blob/main/main.ts#L7: "change the files read to work asyncrnously"',
-  "```",
-  'Where "in" is the keyword to indicate a new task. "https://github.com/octaviuslabs/walter/blob/main/index.ts#L7" is the target of a specific action to be taken. "load this from an environment variable" is the action that is taken.',
-].join("\n");
-
-async function callChat(pmpt: string, hist: utils.Message[]): Promise<string> {
-  console.log("sending request to chat with prompt", pmpt);
+async function callChat(
+  requestId: string,
+  pmpt: string,
+  hist: utils.Message[]
+): Promise<string> {
+  const t0 = Date.now();
+  console.log("sending request to chat with prompt");
+  console.log(pmpt);
   const messages = [
     {
       role: "system",
-      content:
-        //"You are a software development assistant helping to design step by step architecture using pseudocode for other developers to implement.",
-        dslInterpreterMsg.toString(),
+      content: systemMessages.codeGenerator,
     },
     ...hist,
     { role: "user", content: pmpt },
   ];
 
   const res = await openai.createChatCompletion({
-    model: "gpt-3.5-turbo",
+    model: "gpt-4",
     messages,
     n: 1,
-    temperature: 0.7,
+    temperature: 0.5,
+    top_p: 1,
+    max_tokens: 4000,
+    user: "octavius_development_walter",
   });
-
+  console.log("ai response timing", Date.now() - t0, "ms");
   const out = res.data.choices[0].message?.content;
+  saveInteraction(requestId, pmpt, out || "");
 
   if (!out) {
     throw "No response from service";
@@ -57,8 +75,103 @@ async function callChat(pmpt: string, hist: utils.Message[]): Promise<string> {
   return out;
 }
 
+const saveFile = async (
+  requestId: string,
+  fileName: string,
+  content: string
+) => {
+  const dir = path.join(__dirname, ".interactions/", requestId);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  const fn = path.join(dir, fileName);
+  console.log("saving", fn);
+  fs.writeFileSync(fn, content);
+};
+
+const saveInteraction = async function (
+  requestId: string,
+  pmpt: string,
+  response: string
+): Promise<void> {
+  if (!SAVE_INTERACTION) {
+    return;
+  }
+  const content = `# Prompt\n\n${pmpt}\n\n# Response\n\n${response}`;
+  await saveFile(requestId, `${Date.now()}-interaction.md`, content);
+  return;
+};
+
+export function extractCodeFromResponse(res: string): string[] {
+  console.log("extracting code from message");
+  const diffCodeBlockRegex = /```code([\s\S]*?)```/g;
+  const codeBlocks: string[] = [];
+  let match: RegExpExecArray | null;
+
+  while ((match = diffCodeBlockRegex.exec(res)) !== null) {
+    if (match[1]) {
+      codeBlocks.push(match[1].trim());
+    }
+  }
+
+  return codeBlocks;
+}
+
+function removeFileHeaders(diff: string): string {
+  const lines = diff.split("\n");
+  const fileHeaderRegex = /^(-{3}|\+{3})\s/;
+
+  const filteredLines = lines.filter((line) => !fileHeaderRegex.test(line));
+
+  return filteredLines.join("\n");
+}
+
+export const mergeDiff = (original: string, diff: string): string => {
+  return mergeDiffWDmp(original, diff);
+};
+
+export const mergeDiffWDmp = (original: string, diff: string): string => {
+  diff = removeFileHeaders(diff);
+  const patch = dmp.patch_fromText(diff);
+  console.log(patch);
+  const [res, status] = dmp.patch_apply(patch, original);
+  console.log(status);
+
+  return res;
+};
+
+export const mergeDiffWDiffLib = function (
+  original: string,
+  diff: string
+): string {
+  const patches = Diff.parsePatch(diff);
+  console.log(patches);
+  let patchedContent = original;
+  const res = Diff.applyPatch(original, patches[0]);
+  if (res) {
+    return res;
+  }
+
+  throw new Error("Failed to apply patch");
+
+  // Apply each patch in the list of patches
+  //for (const patch of patches) {
+  //const result = Diff.applyPatch(patchedContent, patch);
+
+  //// Check if the patch was applied successfully
+  //if (typeof result === "boolean" && result === false) {
+  //throw new Error("Failed to apply patch");
+  //} else {
+  //patchedContent = result as string;
+  //}
+  //}
+
+  //return patchedContent;
+};
+
 export async function callEdit(pmpt: string, myInput: string): Promise<string> {
   console.log("calling edit with", pmpt);
+  console.log("input", myInput);
   const res = await openai.createEdit({
     model: "code-davinci-edit-001",
     input: myInput,
@@ -82,6 +195,59 @@ export interface CodeEdit {
   body: string;
 }
 
+function applyFileHeader(fileContent: utils.FileContent): string {
+  const fileHeader = "// " + fileContent.parsedUrl.filePath;
+  const firstLine = fileContent.body.split("\n")[0];
+  if (firstLine != fileHeader) {
+    return fileHeader + "\n" + fileContent.body;
+  }
+  return fileContent.body;
+}
+
+export async function createEditWithChat(
+  job: je.ExecutionJob
+): Promise<CodeEdit> {
+  const fileContent = await utils.getFileFromUrl(job.target);
+  let action = [];
+  const fileBody = fileContent.body;
+  action.push(fileBody);
+
+  let linesTxt = [];
+  if (fileContent.parsedUrl.startLine) {
+    linesTxt.push(`On line ${fileContent.parsedUrl.startLine}.`);
+  }
+
+  if (fileContent.parsedUrl.endLine) {
+    linesTxt.push(`To line ${fileContent.parsedUrl.endLine}.`);
+  }
+
+  if (linesTxt.length != 0) {
+    action.push(linesTxt.join(" "));
+  }
+
+  action.push(
+    `Make the following changes to the above file named '${fileContent.parsedUrl.filePath}':`
+  );
+  action.push("- " + job.action);
+
+  const res = await callChat(job.id, action.join("\n"), []);
+  const cleanRes = extractCodeFromResponse(res);
+  if (cleanRes.length == 0) {
+    throw "No code returned from chat";
+  }
+
+  console.log(`Found ${cleanRes.length} code blocks`);
+
+  const body = cleanRes[0];
+  await saveFile(job.id, "mergedFile.md", body);
+
+  return {
+    fileContent,
+    job,
+    body,
+  };
+}
+
 export async function createEdit(job: je.ExecutionJob): Promise<CodeEdit> {
   const fileContent = await utils.getFileFromUrl(job.target);
   let action = [];
@@ -94,14 +260,19 @@ export async function createEdit(job: je.ExecutionJob): Promise<CodeEdit> {
     action.push(`To line ${fileContent.parsedUrl.endLine}.`);
   }
 
-  action.push("Make the following changes.");
+  action.push("Make the following changes to the codebase.");
   action.push(job.action);
 
-  const body = await callEdit(action.join(" "), fileContent.body);
+  let body = await callEdit(action.join(" "), fileContent.body);
+  const merged = mergeDiff(fileContent.body, body);
+  if (!merged) {
+    throw "there was an error applying the diff";
+  }
+
   return {
     fileContent,
     job,
-    body,
+    body: merged,
   };
 }
 
@@ -137,7 +308,7 @@ export async function generatePseudocode(
   }
   const pmpt = pmptArray.join("\n");
 
-  return await callChat(pmpt, []);
+  return await callChat(uuidv4(), pmpt, []);
 }
 
 export async function postComment(

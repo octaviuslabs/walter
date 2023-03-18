@@ -4,6 +4,7 @@ import {
   generatePseudocodeFromEmbedded,
   postComment,
   createEdit,
+  createEditWithChat,
 } from "./psudocode-generator";
 import { handleCodeGeneration, createNewPullRequest } from "./code-committer";
 import Config from "./config";
@@ -16,9 +17,11 @@ const BOT_LABEL = "walter-build";
 
 const webhooks = new Webhooks({ secret: Config.githubWebhookSecret });
 
-function isBotTask(issue: any, repository: string): boolean {
-  // Replace 'bot-label' with the label you want to use to identify bot tasks
-  if (repository != "walter") {
+function isBotTask(issue: any, repository: string, user: string): boolean {
+  if (
+    !Config.supportedRepos.includes(repository) &&
+    !Config.supportedUsers.includes(user)
+  ) {
     return false;
   }
   return issue.labels.some((label: any) => label.name === BOT_LABEL);
@@ -32,9 +35,7 @@ export async function extractTaskInfoAndEmbed(
 
   let description = issueBody;
 
-  console.log("issue body", issueBody);
   const matches = githubUrlRegex.exec(issueBody);
-  console.log(matches);
 
   const files: { link: string; snippit: string }[] = [];
 
@@ -117,19 +118,6 @@ function extractTaskInfo(issue: any): {
   return { description, files, lines };
 }
 
-webhooks.on("issues.opened", async (event: any) => {
-  console.log("new issue");
-  const issue = event.payload.issue;
-  const repository = event.payload.repository;
-
-  if (isBotTask(issue, repository.name)) {
-    console.log("Processing issue", issue);
-    const taskInfo = await extractTaskInfoAndEmbed(issue);
-    const pseudocode = await generatePseudocodeFromEmbedded(taskInfo, []);
-    await postComment(repository, issue, pseudocode);
-  }
-});
-
 type CommentAction =
   | { type: "unknown" }
   | { type: "refine"; body: string; files?: string[]; lines?: number[] }
@@ -141,42 +129,52 @@ webhooks.on("issue_comment.created", async (event: any) => {
   const issue = event.payload.issue;
   const repository = event.payload.repository;
 
-  if (isBotTask(issue, repository.name) && comment.user.login != BOT_NAME) {
+  if (
+    isBotTask(issue, repository.full_name, comment.user.name) &&
+    comment.user.login != BOT_NAME
+  ) {
     console.log("Processing comment", comment, "on", issue);
     const action: CommentAction = parseComment(comment);
     console.log("Parsed comment", action);
 
-    if (action.type === "refine") {
-      // TODO: get history
-      const hist: any = []; //await utils.getCommentHistory(repository, issue.number);
+    try {
+      if (action.type === "refine") {
+        // TODO: get history
+        const hist: any = []; //await utils.getCommentHistory(repository, issue.number);
 
-      const jobs = parseCommentForJobs(action.body);
-      console.log("jobs", jobs);
+        const jobs = parseCommentForJobs(action.body);
+        console.log("jobs", jobs);
 
-      if (jobs.length > 0) {
-        const res = await Promise.all(jobs.map(createEdit));
-        await createNewPullRequest(res, repository, issue.number);
+        if (jobs.length > 0) {
+          const res = await Promise.all(jobs.map(createEditWithChat));
+          await createNewPullRequest(res, repository, issue.number);
+        }
+        return;
+      } else if (action.type === "approve") {
+        console.log("approved");
+        const hist = await utils.getCommentHistory(repository, issue.number);
+        const previousDevMsgs = hist.filter((v) => {
+          return v.role == "developer";
+        });
+
+        if (previousDevMsgs.length == 0) {
+          throw "No previous dev messages";
+        }
+
+        const lastDevMsg = previousDevMsgs[previousDevMsgs.length - 1];
+
+        await handleCodeGeneration(
+          lastDevMsg.content,
+          repository,
+          Config.githubBotName
+        );
+        console.log("processing complete");
       }
-      return;
-    } else if (action.type === "approve") {
-      console.log("approved");
-      const hist = await utils.getCommentHistory(repository, issue.number);
-      const previousDevMsgs = hist.filter((v) => {
-        return v.role == "developer";
-      });
-
-      if (previousDevMsgs.length == 0) {
-        throw "No previous dev messages";
-      }
-
-      const lastDevMsg = previousDevMsgs[previousDevMsgs.length - 1];
-
-      await handleCodeGeneration(
-        lastDevMsg.content,
-        repository,
-        Config.githubBotName
-      );
+    } catch (err) {
+      console.log("ERROR", err);
     }
+  } else {
+    console.log("Ignoring comment");
   }
 });
 

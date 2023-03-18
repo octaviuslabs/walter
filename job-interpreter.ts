@@ -1,6 +1,8 @@
 import * as moo from "moo";
+import { v4 as uuidv4 } from "uuid";
 
 export interface ExecutionJob {
+  id: string;
   keyword: string;
   target: string;
   action: string;
@@ -40,7 +42,7 @@ export function parseCommentForJobs(program: string): ExecutionJob[] {
         if (currentToken && currentToken.type === "action") {
           const action = currentToken.value;
 
-          executionJobs.push({ keyword, target, action });
+          executionJobs.push({ id: uuidv4(), keyword, target, action });
         }
       }
     }

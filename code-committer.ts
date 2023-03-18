@@ -74,13 +74,15 @@ async function commitCode(
   const files = edits.map((edit) => {
     let fileName = edit.fileContent.parsedUrl.filePath;
     if (fileName.charAt(0) == "/") fileName = fileName.substr(1); // Remove leading slash
+    console.log("committing", fileName);
+    console.log(edit.body.substring(0, 120) + "...");
     return {
       path: fileName,
       content: Buffer.from(edit.body).toString("base64"),
     };
   });
 
-  console.log("creating file", files);
+  //console.log("creating file", files);
 
   const treeItems = files.map((file) => ({
     path: file.path,
@@ -94,9 +96,9 @@ async function commitCode(
     repo: repository.name,
     ref: `heads/${branch}`,
   });
-  console.log("refs", myRef);
+  //console.log("refs", myRef);
 
-  console.log("createTree");
+  //console.log("createTree");
   const tree = await octokit.rest.git.createTree({
     owner: repository.owner.login,
     repo: repository.name,
@@ -104,9 +106,9 @@ async function commitCode(
     ref: myRef.data.object.sha,
     base_tree: myRef.data.object.sha,
   });
-  console.log("tree", tree);
+  //console.log("tree", tree);
 
-  console.log("createCommit");
+  //console.log("createCommit");
   const commit = await octokit.rest.git.createCommit({
     owner: repository.owner.login,
     repo: repository.name,
@@ -115,9 +117,9 @@ async function commitCode(
     parents: [myRef.data.object.sha],
   });
 
-  console.log("commit", commit);
+  //console.log("commit", commit);
 
-  console.log("updateRef");
+  //console.log("updateRef");
 
   const refProps = {
     owner: repository.owner.login,
@@ -125,7 +127,7 @@ async function commitCode(
     ref: `heads/${branch}`,
     sha: commit.data.sha,
   };
-  console.log(refProps);
+  //console.log(refProps);
   await octokit.rest.git.updateRef(refProps);
 }
 
@@ -162,8 +164,8 @@ export const createNewPullRequest = async (
   const newBranch = await createBranch(repo);
   console.log("comitting");
   await commitCode(repo, newBranch, result);
-  console.log("committed");
 
+  console.log("creating pull request");
   await createPullRequest(repo, newBranch, issueNumber);
 };
 
@@ -175,12 +177,12 @@ async function handleCodeGeneration(
   const code = await generateCode(pseudocode, repository);
 
   const newBranch = await createBranch(repository);
-  console.log("comitting");
+  //console.log("comitting");
   //await commitCode(repository, newBranch, code);
-  console.log("committed");
+  //console.log("committed");
   const pullRequest = await createPullRequest(repository, newBranch);
-  console.log("pull request opened");
-  console.log(pullRequest);
+  //console.log("pull request opened");
+  //console.log(pullRequest);
 
   return pullRequest;
 }

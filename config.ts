@@ -7,4 +7,10 @@ export default {
   githubWebhookSecret: process.env.GITHUB_WEBHOOK_SECRET || "",
   openApiKey: process.env.OPENAI_API_KEY || "",
   githubBotName: "imwalterbot",
+  supportedRepos: [
+    "octaviuslabs/walter",
+    "octaviuslabs/mailmentor-api",
+    "octaviuslabs/mailmentor-ui",
+  ],
+  supportedUsers: ["jsfour"],
 };
