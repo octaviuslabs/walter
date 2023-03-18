@@ -13,4 +13,5 @@ export default {
     "octaviuslabs/mailmentor-ui",
   ],
   supportedUsers: ["jsfour"],
+  saveInteractions: process.env.SAVE_INTERACTIONS == "true",
 };

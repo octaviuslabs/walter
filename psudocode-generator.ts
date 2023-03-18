@@ -7,6 +7,7 @@ import fs from "fs";
 import path from "path";
 import * as Diff from "diff";
 import { v4 as uuidv4 } from "uuid";
+import Config from "./config";
 
 const SAVE_INTERACTION = true;
 
@@ -94,7 +95,7 @@ const saveInteraction = async function (
   pmpt: string,
   response: string
 ): Promise<void> {
-  if (!SAVE_INTERACTION) {
+  if (!Config.saveInteractions) {
     return;
   }
   const content = `# Prompt\n\n${pmpt}\n\n# Response\n\n${response}`;

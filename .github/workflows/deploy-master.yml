@@ -1,0 +1,20 @@
+name: Deploy Master (Prod)
+on:
+  push:
+    branches: [master]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Deploy to heroku
+        uses: gonuit/heroku-docker-deploy@v1.3.3
+        with:
+          email: ${{ secrets.HEROKU_EMAIL }}
+          heroku_api_key: ${{ secrets.HEROKU_KEY }}
+          heroku_app_name: "walter-bot"
+          dockerfile_directory: "./"
+          process_type: "web"
+          docker_options: "--no-cache"
