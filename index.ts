@@ -5,7 +5,7 @@ import {
   postComment,
   createEdit,
   createEditWithChat,
-} from "./psudocode-generator";
+} from "./code-generator";
 import {
   getFileFromPullRequestComment,
   handleCodeGeneration,
