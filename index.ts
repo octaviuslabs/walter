@@ -12,10 +12,10 @@ import {
   createNewPullRequest,
 } from "./code-committer";
 import Config from "./config";
-import octokit from "./gh";
+import octokit, { parseGitHubURL } from "./gh";
 import * as utils from "./utils";
 import { parseCommentForJobs } from "./job-interpreter";
-import winston from "./log";
+import Log from "./log";
 import fastq from "fastq";
 
 const BOT_NAME = Config.githubBotName;
@@ -52,8 +52,7 @@ export async function extractTaskInfoAndEmbed(
 
   for (let i = 0; i < matches.length; i++) {
     const match = matches[i];
-    const parsedUrl = utils.parseGitHubURL(match);
-    winston.log("info", parsedUrl);
+    const parsedUrl = parseGitHubURL(match);
 
     if (!parsedUrl) continue;
 
@@ -70,14 +69,14 @@ export async function extractTaskInfoAndEmbed(
         "base64"
       ).toString();
 
-      winston.log("info", "file contents", fileContent);
+      Log.info("file contents", fileContent);
 
       files.push({
         link: match,
         snippit: fileContent,
       });
     } catch (err: any) {
-      winston.log(
+      Log.info(
         "error",
         `Error fetching file content from GitHub: ${err.message}`
       );
@@ -129,12 +128,12 @@ webhooks.on("issue_comment.created", async (event: any) => {
     isBotTask(issue, repository.full_name, comment.user.name) &&
     comment.user.login != BOT_NAME
   ) {
-    queue.push(event);
     await postComment(
       event.payload.repository,
       event.payload.issue,
-      "Queued for processing..."
+      [`> ${comment.body} `, "Queued for processing..."].join("\n\n")
     );
+    queue.push(event);
   }
 });
 
@@ -147,6 +146,7 @@ async function processEvent(event: any) {
     isBotTask(issue, repository.full_name, comment.user.name) &&
     comment.user.login != BOT_NAME
   ) {
+    Log.info("Processing event");
     postComment(
       event.payload.repository,
       event.payload.issue,
@@ -154,13 +154,12 @@ async function processEvent(event: any) {
     );
     //winston.log("info", "Processing comment", comment, "on", issue);
     const action: CommentAction = parseComment(comment);
-    winston.log("info", "Parsed comment", action);
 
     try {
       if (action.type === "refine") {
+        Log.info("Processing refine task");
         const hist: any = [];
         const jobs = parseCommentForJobs(action.body);
-        winston.log("info", "jobs", jobs);
 
         if (jobs.length > 0) {
           const res = await Promise.all(jobs.map(createEditWithChat));
@@ -168,38 +167,21 @@ async function processEvent(event: any) {
         }
         return;
       } else if (action.type === "approve") {
-        winston.log("info", "approved");
-        const hist = await utils.getCommentHistory(repository, issue.number);
-        const previousDevMsgs = hist.filter((v) => {
-          return v.role == "developer";
-        });
-
-        if (previousDevMsgs.length == 0) {
-          throw "No previous dev messages";
-        }
-
-        const lastDevMsg = previousDevMsgs[previousDevMsgs.length - 1];
-
-        await handleCodeGeneration(
-          lastDevMsg.content,
-          repository,
-          Config.githubBotName
-        );
-        winston.log("info", "processing complete");
+        Log.info("Processing approve task");
       } else if (action.type === "design") {
         processDesignAction(action.body);
       }
     } catch (err) {
-      winston.log("error", "ERROR", err);
+      Log.log("error", "ERROR", err);
     }
   } else {
-    winston.log("info", "Ignoring comment");
+    Log.log("info", "Ignoring comment");
   }
 }
 
 webhooks.on("pull_request_review_comment.created", async (event: any) => {
   const comment = event.payload.comment;
-  winston.log("info", "Pull request comment body:", comment.body);
+  Log.info("Pull request comment body:", comment.body);
   //getFileFromPullRequestComment(repository, commentId)
 });
 
@@ -230,7 +212,7 @@ async function parseCommentWithEmbedded(comment: any): Promise<CommentAction> {
 }
 
 function processDesignAction(commentBody: string) {
-  winston.log("info", `Design action comment body: ${commentBody}`);
+  Log.info(`Design action comment body: ${commentBody}`);
 }
 
 const middleware = createNodeMiddleware(webhooks, { path: "/webhook" });
@@ -239,4 +221,4 @@ const app = express();
 app.use(middleware);
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => winston.log("info", `Server listening on port ${PORT}`));
+app.listen(PORT, () => Log.info(`Server listening on port ${PORT}`));

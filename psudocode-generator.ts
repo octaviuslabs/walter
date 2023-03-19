@@ -8,6 +8,8 @@ import path from "path";
 import * as Diff from "diff";
 import { v4 as uuidv4 } from "uuid";
 import Config from "./config";
+import log from "./log";
+import { getCachedDeps } from "./dependency-graph-parser";
 
 const SAVE_INTERACTION = true;
 
@@ -45,6 +47,7 @@ async function callChat(
   hist: utils.Message[]
 ): Promise<string> {
   const t0 = Date.now();
+  log.info(`Sending request to chat`);
   //console.log("sending request to chat with prompt");
   //console.log(pmpt);
   const messages = [
@@ -208,9 +211,16 @@ function applyFileHeader(fileContent: utils.FileContent): string {
 export async function createEditWithChat(
   job: je.ExecutionJob
 ): Promise<CodeEdit> {
+  log.info(`Creating edit`);
+  //const deps = await getCachedDeps(job.target);
+  //log.info(`Got deps`);
   const fileContent = await utils.getFileFromUrl(job.target);
+
   let action = [];
   const fileBody = fileContent.body;
+  //action.push("-- DEPENDENCIES --");
+  //action.push(deps.toString());
+  //action.push("-- END DEPENDENCIES --");
   action.push(fileBody);
 
   let linesTxt = [];
@@ -317,7 +327,7 @@ export async function postComment(
   issue: any,
   commentBody: string
 ): Promise<void> {
-  console.log("POSTING COMMENT", commentBody);
+  //console.log("POSTING COMMENT", commentBody);
   await octokit.rest.issues.createComment({
     owner: repository.owner.login,
     repo: repository.name,

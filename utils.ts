@@ -1,7 +1,7 @@
 import Config from "./config";
 import octokit from "./gh";
-import UrlPattern from "url-pattern";
 import { URL } from "node:url";
+import { ParsedGitHubURL, parseGitHubURL } from "./gh";
 
 interface Repository {
   owner: {
@@ -35,49 +35,9 @@ export async function getCommentHistory(
   return commentHistory;
 }
 
-export interface ParsedGitHubURL {
-  owner: string;
-  repo: string;
-  branch: string;
-  filePath: string;
-  startLine: number | undefined;
-  endLine: number | undefined;
-  url: string;
-}
-
-export function parseGitHubURL(url: string): ParsedGitHubURL | null {
-  // https://github.com/octaviuslabs/mailmentor-api/blob/main/src/resolvers/index.ts#L67
-  const myUrl = new URL(url);
-  console.log("extracting from url", url);
-
-  const splitPath = myUrl.pathname.split("/");
-  const [_, owner, repo, pass, branch] = splitPath;
-  const filePath = "/" + splitPath.slice(5, splitPath.length).join("/");
-
-  const lineRange = myUrl.hash.split("-");
-  let startLine: number | undefined = undefined;
-  let endLine: number | undefined = undefined;
-  if (lineRange.length > 0) {
-    startLine = parseInt(lineRange[0].substring(2));
-  }
-
-  if (lineRange.length > 1) {
-    endLine = parseInt(lineRange[1].substring(1));
-  }
-
-  return {
-    owner,
-    repo,
-    branch,
-    filePath,
-    startLine,
-    endLine,
-    url,
-  };
-}
-
 export interface FileContent {
   body: string;
+  focus?: string;
   parsedUrl: ParsedGitHubURL;
 }
 
@@ -99,8 +59,18 @@ export const getFileFromUrl = async (url: string): Promise<FileContent> => {
     "base64"
   ).toString();
 
+  let focus: string | undefined;
+  if (parsedUrl.startLine) {
+    // TODO could be good to fuzzily get the end rather then going to end of time
+    const lines = body.split("\n");
+    const endLine = parsedUrl.endLine || lines.length - 1;
+
+    focus = lines.slice(parsedUrl.startLine - 1, endLine).join("\n");
+  }
+
   return {
     body,
     parsedUrl,
+    focus,
   };
 };
