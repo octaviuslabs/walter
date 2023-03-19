@@ -1,6 +1,6 @@
 import openai from "./openai";
 import octokit from "./gh";
-import * as psg from "./psudocode-generator";
+import * as psg from "./code-generator";
 
 interface Repository {
   owner: {
@@ -185,4 +185,3 @@ async function getFileFromPullRequestComment(
 }
 
 export { getFileFromPullRequestComment };
-
