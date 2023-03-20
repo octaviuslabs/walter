@@ -193,9 +193,12 @@ webhooks.on("pull_request_review_comment.created", async (event: any) => {
 });
 
 function parseComment(comment: any): CommentAction {
-  const approveRegex = new RegExp(`@${BOT_NAME}\\s*APPROVED`, "i");
+  function isCommentApproving(commentBody: string, botName: string): boolean {
+    const approvePattern = new RegExp(`@${botName}\\s*APPROVED`, "i");
+    return approvePattern.test(commentBody);
+  }
 
-  if (approveRegex.test(comment.body)) {
+  if (isCommentApproving(comment.body, BOT_NAME)) {
     return { type: "approve", body: comment.body };
   }
 
