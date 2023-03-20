@@ -9,22 +9,41 @@ import * as Diff from "diff";
 import { v4 as uuidv4 } from "uuid";
 import Config from "./config";
 import log from "./log";
-import { getCachedDeps } from "./dependency-graph-parser";
 
 const SAVE_INTERACTION = true;
 
 const dmp = new DMP.diff_match_patch();
 
-const systemMessages = {
-  diffGenerator: fs.readFileSync(
+export enum ChatType {
+  Code,
+  Diff,
+  Design,
+}
+
+const systemMessages: Map<ChatType, string> = new Map();
+systemMessages.set(
+  ChatType.Diff,
+  fs.readFileSync(
     path.join(__dirname, "system-messages", "diff-generator.md"),
     "utf8"
-  ),
-  codeGenerator: fs.readFileSync(
+  )
+);
+
+systemMessages.set(
+  ChatType.Code,
+  fs.readFileSync(
     path.join(__dirname, "system-messages", "code-generator.md"),
     "utf8"
-  ),
-};
+  )
+);
+
+systemMessages.set(
+  ChatType.Design,
+  fs.readFileSync(
+    path.join(__dirname, "system-messages", "design-assistant.md"),
+    "utf8"
+  )
+);
 
 export async function generatePseudocodeFromEmbedded(
   task: string,
@@ -41,19 +60,26 @@ export async function generatePseudocodeFromEmbedded(
   return callChat(uuidv4(), pmpt, hist);
 }
 
-async function callChat(
+export async function callChat(
   requestId: string,
   pmpt: string,
-  hist: utils.Message[]
+  hist: utils.Message[],
+  chatType: ChatType = ChatType.Code
 ): Promise<string> {
   const t0 = Date.now();
   log.info(`Sending request to chat`);
   //console.log("sending request to chat with prompt");
   //console.log(pmpt);
+  //
+  const systemMsg = systemMessages.get(chatType);
+  if (!systemMsg) {
+    throw "System message not found";
+  }
+
   const messages = [
     {
       role: "system",
-      content: systemMessages.codeGenerator,
+      content: systemMsg,
     },
     ...hist,
     { role: "user", content: pmpt },
@@ -209,58 +235,70 @@ function applyFileHeader(fileContent: utils.FileContent): string {
 }
 
 export async function createEditWithChat(
-  job: je.ExecutionJob
+  job: je.ExecutionJob,
+  chatHistory: utils.Message[]
 ): Promise<CodeEdit> {
   log.info(`Creating edit`);
+  chatHistory = chatHistory || [];
   //const deps = await getCachedDeps(job.target);
   //log.info(`Got deps`);
-  const fileContent = await utils.getFileFromUrl(job.target);
-
   let action = [];
-  const fileBody = fileContent.body;
-  //action.push("-- DEPENDENCIES --");
-  //action.push(deps.toString());
-  //action.push("-- END DEPENDENCIES --");
-  action.push(fileBody);
+  if (job.targets.length == 1) {
+    // TODO: only grab first file
+    const fileContent = await utils.getFileFromUrl(job.targets[0]);
 
-  let linesTxt = [];
-  if (fileContent.parsedUrl.startLine) {
-    linesTxt.push(`On line ${fileContent.parsedUrl.startLine}.`);
+    const fileBody = fileContent.body;
+    //action.push("-- DEPENDENCIES --");
+    //action.push(deps.toString());
+    //action.push("-- END DEPENDENCIES --");
+    action.push(fileBody);
+
+    let linesTxt = [];
+    if (fileContent.parsedUrl.startLine) {
+      linesTxt.push(`On line ${fileContent.parsedUrl.startLine}.`);
+    }
+
+    if (fileContent.parsedUrl.endLine) {
+      linesTxt.push(`To line ${fileContent.parsedUrl.endLine}.`);
+    }
+
+    if (linesTxt.length != 0) {
+      action.push(linesTxt.join(" "));
+    }
+
+    action.push(
+      `Make the following changes to the above file named '${fileContent.parsedUrl.filePath}':`
+    );
+    action.push("- " + job.action);
+
+    const res = await callChat(
+      job.id,
+      action.join("\n"),
+      chatHistory,
+      ChatType.Code
+    );
+    const cleanRes = extractCodeFromResponse(res);
+    if (cleanRes.length == 0) {
+      throw "No code returned from chat";
+    }
+
+    console.log(`Found ${cleanRes.length} code blocks`);
+
+    const body = cleanRes[0];
+    await saveFile(job.id, "mergedFile.md", body);
+
+    return {
+      fileContent,
+      job,
+      body,
+    };
+  } else {
+    throw "You must target at least one file";
   }
-
-  if (fileContent.parsedUrl.endLine) {
-    linesTxt.push(`To line ${fileContent.parsedUrl.endLine}.`);
-  }
-
-  if (linesTxt.length != 0) {
-    action.push(linesTxt.join(" "));
-  }
-
-  action.push(
-    `Make the following changes to the above file named '${fileContent.parsedUrl.filePath}':`
-  );
-  action.push("- " + job.action);
-
-  const res = await callChat(job.id, action.join("\n"), []);
-  const cleanRes = extractCodeFromResponse(res);
-  if (cleanRes.length == 0) {
-    throw "No code returned from chat";
-  }
-
-  console.log(`Found ${cleanRes.length} code blocks`);
-
-  const body = cleanRes[0];
-  await saveFile(job.id, "mergedFile.md", body);
-
-  return {
-    fileContent,
-    job,
-    body,
-  };
 }
 
 export async function createEdit(job: je.ExecutionJob): Promise<CodeEdit> {
-  const fileContent = await utils.getFileFromUrl(job.target);
+  const fileContent = await utils.getFileFromUrl(job.targets[0]);
   let action = [];
   // TODO: support end line
   if (fileContent.parsedUrl.startLine) {

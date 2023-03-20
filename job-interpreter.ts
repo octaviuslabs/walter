@@ -1,10 +1,11 @@
 import * as moo from "moo";
 import { v4 as uuidv4 } from "uuid";
+import * as utils from "./utils";
 
 export interface ExecutionJob {
   id: string;
-  keyword: string;
-  target: string;
+  keyword?: string;
+  targets: string[];
   action: string;
 }
 
@@ -42,7 +43,12 @@ export function parseCommentForJobs(program: string): ExecutionJob[] {
         if (currentToken && currentToken.type === "action") {
           const action = currentToken.value;
 
-          executionJobs.push({ id: uuidv4(), keyword, target, action });
+          executionJobs.push({
+            id: uuidv4(),
+            keyword,
+            targets: [target],
+            action,
+          });
         }
       }
     }
@@ -51,4 +57,14 @@ export function parseCommentForJobs(program: string): ExecutionJob[] {
   }
 
   return executionJobs;
+}
+
+export function parseFreeTextForJob(inStr: string): ExecutionJob {
+  const urls = utils.extractUrls(inStr);
+
+  return {
+    id: uuidv4(),
+    targets: urls.map((ele) => ele.url),
+    action: inStr,
+  };
 }

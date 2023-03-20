@@ -1,7 +1,6 @@
 import Config from "./config";
-import octokit from "./gh";
 import { URL } from "node:url";
-import { ParsedGitHubURL, parseGitHubURL } from "./gh";
+import octokit, { ParsedGitHubURL, parseGitHubURL } from "./gh";
 
 interface Repository {
   owner: {
@@ -28,7 +27,7 @@ export async function getCommentHistory(
   const commentHistory: Message[] = commentsResponse.data
     .filter((comment) => comment.user !== null && comment.body !== null)
     .map((comment) => ({
-      role: comment.user?.login === Config.githubBotName ? "developer" : "user",
+      role: comment.user?.login === Config.githubBotName ? "assistant" : "user",
       content: comment.body || "",
     }));
 
@@ -73,4 +72,16 @@ export const getFileFromUrl = async (url: string): Promise<FileContent> => {
     parsedUrl,
     focus,
   };
+};
+
+export const extractUrls = (textBody: string): ParsedGitHubURL[] => {
+  const rx =
+    /(?:(?:https?|ftp|file):\/\/|www\.|ftp\.)(?:\([-A-Z0-9+&@#\/%=~_|$?!:,.]*\)|[-A-Z0-9+&@#\/%=~_|$?!:,.])*(?:\([-A-Z0-9+&@#\/%=~_|$?!:,.]*\)|[A-Z0-9+&@#\/%=~_|$])/gim;
+
+  const matches = textBody.match(rx) || [];
+  const out = [];
+  for (const match of matches) {
+    out.push(parseGitHubURL(match));
+  }
+  return out;
 };
