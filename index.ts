@@ -179,7 +179,7 @@ async function processEvent(event: any) {
         processDesignAction(event);
       }
     } catch (err) {
-      Log.log("error", "ERROR", err);
+      Log.error(err);
     }
   } else {
     Log.log("info", "Ignoring comment");
