@@ -21,6 +21,10 @@ import Log from "./log";
 import fastq from "fastq";
 import { v4 as uuidv4 } from "uuid";
 
+process.on("unhandledRejection", (err: any) => {
+  Log.error(err.stack);
+});
+
 const BOT_NAME = Config.githubBotName;
 const BOT_LABEL = "walter-build";
 
