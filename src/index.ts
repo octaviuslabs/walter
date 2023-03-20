@@ -245,6 +245,29 @@ async function processDesignAction(event: any) {
   await postComment(event.payload.repository, event.payload.issue, res);
 }
 
+webhooks.on("pull_request", async (event: any) => {
+  if (event.payload.action === "opened" || event.payload.action === "synchronize") {
+    const pullRequest = event.payload.pull_request;
+    const relatedIssueNumber = extractRelatedIssue(pullRequest.body);
+    
+    // Log the related issue number at the specified location
+    // https://github.com/octaviuslabs/walter/blob/main/src/index.ts#L193
+    Log.info("Related issue number:", relatedIssueNumber);
+  }
+});
+
+// Function to extract the related issue number from the pull request description
+function extractRelatedIssue(description: string): number {
+  const issueRegex = /(?:issues\/)(\d+)/i;
+  const match = description.match(issueRegex);
+
+  if (match && match[1]) {
+    return parseInt(match[1]);
+  } else {
+    return -1; // Return -1 if no related issue is found
+  }
+}
+
 const middleware = createNodeMiddleware(webhooks, { path: "/webhook" });
 
 const app = express();
