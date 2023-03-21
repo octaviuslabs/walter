@@ -145,6 +145,10 @@ export default class DependencyGraphParser {
   }
 
   public toString(): string {
+    return this.toStrings().join("\n");
+  }
+
+  public toStrings(): string[] {
     const order = this.graph.overallOrder();
     const printer = ts.createPrinter();
 
@@ -155,7 +159,7 @@ export default class DependencyGraphParser {
       out.push(printer.printFile(data));
       out.push(`// END: ${node}`);
     }
-    return out.join("\n");
+    return out;
   }
 
   public toSourceFile(): ts.SourceFile {
