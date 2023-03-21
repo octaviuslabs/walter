@@ -1,6 +1,8 @@
 import { Octokit } from "@octokit/rest";
 import Config from "./config";
 import Log from "./log";
+import * as ts from 'typescript';
+import { OpenAIClient } from 'openai-client';
 
 export interface IGitHubFileFetcher {
   repoOwner: string;
@@ -41,6 +43,50 @@ export class GitHubFileFetcher implements IGitHubFileFetcher {
     } else {
       throw new Error(`Could not fetch file content for: ${filePath}`);
     }
+  }
+
+  async fetchAndParseFunctions(filePath: string): Promise<void> {
+    // Fetch the TypeScript file content
+    const fileContent = await this.getFileContent(filePath);
+
+    // Parse the fetched TypeScript file content to extract all functions
+    const functions = this.parseFunctions(fileContent);
+
+    // Generate code embeddings for the extracted functions
+    const embeddings = await this.generateEmbeddings(functions);
+
+    // Log the embeddings
+    console.log(embeddings);
+  }
+
+  parseFunctions(fileContent: string): Array<Function> {
+    const functions = [];
+    const sourceFile = ts.createSourceFile('temp.ts', fileContent, ts.ScriptTarget.Latest, true);
+
+    const visitNode = (node: ts.Node) => {
+      if (ts.isFunctionDeclaration(node) || ts.isArrowFunction(node) || ts.isMethodDeclaration(node)) {
+        functions.push(node);
+      }
+      ts.forEachChild(node, visitNode);
+    };
+
+    ts.forEachChild(sourceFile, visitNode);
+    return functions;
+  }
+
+  async generateEmbeddings(functions: Array<Function>): Promise<Array<Embedding>> {
+    // Initialize OpenAI client
+    const openaiClient = new OpenAIClient(YOUR_OPENAI_API_KEY);
+
+    // Generate code embeddings for the functions using the OpenAI embeddings endpoint
+    const embeddings = [];
+    for (const func of functions) {
+      const codeSnippet = func.getText();
+      const embedding = await openaiClient.generateEmbedding(codeSnippet);
+      embeddings.push(embedding);
+    }
+
+    return embeddings;
   }
 }
 
