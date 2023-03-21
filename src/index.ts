@@ -124,7 +124,8 @@ type CommentAction =
   | { type: "unknown" }
   | { type: "refine"; body: string; files?: string[]; lines?: number[] }
   | { type: "approve"; body: string; files?: string[]; lines?: number[] }
-  | { type: "design"; body: string };
+  | { type: "design"; body: string }
+  | { type: "status"; body: string };
 
 webhooks.on("issue_comment.created", async (event: any) => {
   const comment = event.payload.comment;
@@ -198,12 +199,17 @@ webhooks.on("pull_request_review_comment.created", async (event: any) => {
 
 function parseComment(comment: any): CommentAction {
   const approveRegex = new RegExp(`@${BOT_NAME}\\s*APPROVED`, "i");
+  const statusRegex = new RegExp(`(Queued for processing...|Processing this now)`, "i");
+
+  if (comment.user.login === BOT_NAME && statusRegex.test(comment.body)) {
+    return { type: "status", body: comment.body };
+  }
 
   if (approveRegex.test(comment.body)) {
     return { type: "approve", body: comment.body };
   }
 
-  // deisgn by default
+  // design by default
   return { type: "design", body: comment.body };
 }
 
