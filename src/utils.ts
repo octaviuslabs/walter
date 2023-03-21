@@ -12,6 +12,9 @@ interface Repository {
 export interface Message {
   role: any;
   content: string;
+  user?: {
+    login: string;
+  } | null;
 }
 
 export async function getCommentHistory(
@@ -34,8 +37,12 @@ export async function getCommentHistory(
 
   // Include the issue body as the first comment in the comment history
   const issueBody: Message = {
-    role: issueResponse.data.user?.login === Config.githubBotName ? "assistant" : "user",
+    role:
+      issueResponse.data.user?.login === Config.githubBotName
+        ? "assistant"
+        : "user",
     content: issueResponse.data.body || "",
+    user: issueResponse.data.user,
   };
 
   const commentHistory: Message[] = commentsResponse.data
@@ -43,6 +50,7 @@ export async function getCommentHistory(
     .map((comment) => ({
       role: comment.user?.login === Config.githubBotName ? "assistant" : "user",
       content: comment.body || "",
+      user: comment.user,
     }));
 
   // Add the issue body to the beginning of the comment history
@@ -100,3 +108,4 @@ export const extractUrls = (textBody: string): ParsedGitHubURL[] => {
   }
   return out;
 };
+
