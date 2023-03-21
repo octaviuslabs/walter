@@ -168,3 +168,58 @@ export default class DependencyGraphParser {
     );
   }
 }
+
+class TypeDependencyGraphParser extends DependencyGraphParser {
+  constructor(gitHubFileUrl: string) {
+    super(gitHubFileUrl);
+  }
+
+  public async build(): Promise<DepGraph<ts.SourceFile>> {
+    Log.info(
+      `Building type dependency graph for ${this.targetFile.url} excluding target`
+    );
+    const deps = await this.getDependencies(this.targetFile);
+
+    for (const dep of deps.deps) {
+      await this.processFileForTypes(dep);
+    }
+    return this.graph;
+  }
+
+  private async processFileForTypes(url: ParsedGitHubURL): Promise<void> {
+    Log.info(`Processing file for types ${url.url}`);
+    if (this.graph.hasNode(url.url)) {
+      Log.info(`Node exists ${url.url}`);
+      return;
+    }
+
+    const src = await this.getDependencies(url);
+    const typeOnlySourceFile = this.extractTypeDeclarations(src.sourceFile);
+    this.graph.addNode(url.url, typeOnlySourceFile);
+
+    for (const dep of src.deps) {
+      await this.processFileForTypes(dep);
+      Log.info(`Adding edge ${src.url.url} -> ${dep.url}`);
+      this.graph.addDependency(src.url.url, dep.url);
+    }
+  }
+
+  private extractTypeDeclarations(sourceFile: ts.SourceFile): ts.SourceFile {
+    const typeDeclarations: ts.Node[] = [];
+
+    const visitNode = (node: ts.Node): void => {
+      if (ts.isTypeAliasDeclaration(node) || ts.isInterfaceDeclaration(node) || ts.isEnumDeclaration(node)) {
+        typeDeclarations.push(node);
+      } else {
+        ts.forEachChild(node, visitNode);
+      }
+    };
+
+    ts.forEachChild(sourceFile, visitNode);
+
+    // Create a new source file with only type declarations
+    const typeDeclarationSourceFile = ts.updateSourceFileNode(sourceFile, typeDeclarations);
+
+    return typeDeclarationSourceFile;
+  }
+}
