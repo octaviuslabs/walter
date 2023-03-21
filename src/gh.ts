@@ -1,6 +1,8 @@
 import { Octokit } from "@octokit/rest";
 import Config from "./config";
 import Log from "./log";
+import * as ts from 'typescript';
+import { OpenAIClient } from 'openai-client';
 
 export interface IGitHubFileFetcher {
   repoOwner: string;
@@ -41,6 +43,26 @@ export class GitHubFileFetcher implements IGitHubFileFetcher {
     } else {
       throw new Error(`Could not fetch file content for: ${filePath}`);
     }
+  }
+
+  async fetchAndParseFunctions(filePath: string): Promise<void> {
+    const fileContent = await this.getFileContent(filePath);
+    const functions = this.parseFunctions(fileContent);
+    const embeddings = await this.generateEmbeddings(functions);
+    console.log(embeddings);
+  }
+
+  parseFunctions(fileContent: string): Array<Function> {
+    // Use TypeScript compiler to parse the file content and extract functions
+    // ...
+  }
+
+  async generateEmbeddings(functions: Array<Function>): Promise<Array<Embedding>> {
+    // Initialize OpenAI client
+    const openaiClient = new OpenAIClient(YOUR_OPENAI_API_KEY);
+
+    // Generate code embeddings for the functions using the OpenAI embeddings endpoint
+    // ...
   }
 }
 
