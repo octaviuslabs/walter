@@ -1,6 +1,10 @@
 import { Octokit } from "@octokit/rest";
 import Config from "./config";
 import Log from "./log";
+import * as oct from "@octokit/webhooks-types";
+
+const octokit = new Octokit({ auth: Config.githubApiToken });
+export default octokit;
 
 export interface IGitHubFileFetcher {
   repoOwner: string;
@@ -117,6 +121,84 @@ export function parseGitHubURL(url: string): ParsedGitHubURL {
   };
 }
 
-const octokit = new Octokit({ auth: Config.githubApiToken });
+export interface Message {
+  role: any;
+  content: string;
+  user?: oct.User | null;
+}
 
-export default octokit;
+export async function getCommentHistory(
+  repository: oct.Repository,
+  issueNumber: number
+): Promise<Message[]> {
+  // Fetch the issue details
+  const issueResponse = await octokit.rest.issues.get({
+    owner: repository.owner.login,
+    repo: repository.name,
+    issue_number: issueNumber,
+  });
+
+  // Fetch the issue comments
+  const commentsResponse = await octokit.rest.issues.listComments({
+    owner: repository.owner.login,
+    repo: repository.name,
+    issue_number: issueNumber,
+  });
+
+  // Include the issue body as the first comment in the comment history
+  const issueBody: Message = {
+    role:
+      issueResponse.data.user?.login === Config.githubBotName
+        ? "assistant"
+        : "user",
+    content: issueResponse.data.body || "",
+    user: issueResponse.data.user as oct.User,
+  };
+
+  const commentHistory: Message[] = commentsResponse.data
+    .filter((comment) => comment.user !== null && comment.body !== null)
+    .map((comment) => ({
+      role: comment.user?.login === Config.githubBotName ? "assistant" : "user",
+      content: comment.body || "",
+      user: comment.user as oct.User,
+    }));
+
+  // Add the issue body to the beginning of the comment history
+  return [issueBody, ...commentHistory];
+}
+
+export async function postIssueComment(
+  repository: oct.Repository,
+  issue: oct.Issue,
+  commentBody: string
+): Promise<void> {
+  Log.info(`Posting comment to issue: ${issue.number}`);
+  await octokit.rest.issues.createComment({
+    owner: repository.owner.login,
+    repo: repository.name,
+    issue_number: issue.number,
+    body: commentBody,
+  });
+}
+
+async function getFileFromPullRequestComment(
+  repository: oct.Repository,
+  commentId: number
+): Promise<any> {
+  const comment = await octokit.rest.pulls.getReviewComment({
+    owner: repository.owner.login,
+    repo: repository.name,
+    comment_id: commentId,
+  });
+
+  const file = await octokit.rest.repos.getContent({
+    owner: repository.owner.login,
+    repo: repository.name,
+    path: comment.data.path,
+    ref: comment.data.commit_id,
+  });
+
+  return file.data;
+}
+
+export { getFileFromPullRequestComment };

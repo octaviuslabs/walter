@@ -114,7 +114,8 @@ async function commitCode(
 async function createPullRequest(
   repository: Repository,
   branch: string,
-  issueNumber?: number
+  issueNumber?: number,
+  targetBranch?: string
 ): Promise<any> {
   let prTitle = "Issue resolution";
   let prBody = `This PR contains AI generatd code.`;
@@ -128,7 +129,7 @@ async function createPullRequest(
     repo: repository.name,
     title: prTitle,
     head: branch,
-    base: "main",
+    base: targetBranch || "main",
     body: prBody,
   });
 
@@ -148,40 +149,3 @@ export const createNewPullRequest = async (
   console.log("creating pull request");
   await createPullRequest(repo, newBranch, issueNumber);
 };
-
-async function handleCodeGeneration(
-  pseudocode: string,
-  repository: Repository,
-  user: string
-): Promise<any> {
-  const code = await generateCode(pseudocode, repository);
-
-  const newBranch = await createBranch(repository);
-  const pullRequest = await createPullRequest(repository, newBranch);
-
-  return pullRequest;
-}
-
-export { handleCodeGeneration };
-
-async function getFileFromPullRequestComment(
-  repository: Repository,
-  commentId: number
-): Promise<any> {
-  const comment = await octokit.rest.pulls.getReviewComment({
-    owner: repository.owner.login,
-    repo: repository.name,
-    comment_id: commentId,
-  });
-
-  const file = await octokit.rest.repos.getContent({
-    owner: repository.owner.login,
-    repo: repository.name,
-    path: comment.data.path,
-    ref: comment.data.commit_id,
-  });
-
-  return file.data;
-}
-
-export { getFileFromPullRequestComment };

@@ -14,4 +14,5 @@ export default {
   ],
   supportedUsers: ["jsfour"],
   saveInteractions: process.env.SAVE_INTERACTIONS == "true",
+  botTaskLabel: "walter-build",
 };

@@ -9,6 +9,7 @@ import * as Diff from "diff";
 import { v4 as uuidv4 } from "uuid";
 import Config from "./config";
 import log from "./log";
+import * as gh from "./gh";
 
 const SAVE_INTERACTION = true;
 
@@ -45,25 +46,11 @@ systemMessages.set(
   )
 );
 
-export async function generatePseudocodeFromEmbedded(
-  task: string,
-  hist: utils.Message[]
-): Promise<string> {
-  let pmptArray = [];
-  pmptArray.push(
-    //`Write instructions on which files to change and what changes to make to accomplish the following task:\n\n${task}`
-    task
-  );
-
-  const pmpt = pmptArray.join("\n");
-
-  return callChat(uuidv4(), pmpt, hist);
-}
-
 export async function callChat(
   requestId: string,
   pmpt: string,
-  hist: utils.Message[],
+  hist: gh.Message[],
+  dependencies: string[], //DEPENDENCIES
   chatType: ChatType = ChatType.Code
 ): Promise<string> {
   const t0 = Date.now();
@@ -71,6 +58,18 @@ export async function callChat(
   //console.log("sending request to chat with prompt");
   //console.log(pmpt);
   //
+  hist = hist.map((msg) => {
+    return {
+      ...msg,
+      user: undefined,
+    };
+  });
+  const depsMsgs = dependencies.map((dep) => {
+    return {
+      role: "user" as any,
+      content: dep,
+    };
+  });
   const systemMsg = systemMessages.get(chatType);
   if (!systemMsg) {
     throw "System message not found";
@@ -81,6 +80,7 @@ export async function callChat(
       role: "system",
       content: systemMsg,
     },
+    ...depsMsgs,
     ...hist,
     { role: "user", content: pmpt },
   ];
@@ -94,9 +94,9 @@ export async function callChat(
     max_tokens: 4000,
     user: "octavius_development_walter",
   });
-  console.log("ai response timing", Date.now() - t0, "ms");
+  log.info(`ai response timing ${Date.now() - t0} ms`);
   const out = res.data.choices[0].message?.content;
-  saveInteraction(requestId, pmpt, out || "");
+  await saveInteraction(requestId, hist, pmpt, out || "");
 
   if (!out) {
     throw "No response from service";
@@ -115,25 +115,39 @@ const saveFile = async (
     fs.mkdirSync(dir, { recursive: true });
   }
   const fn = path.join(dir, fileName);
-  console.log("saving", fn);
+  log.info(`Saving File ${fn}`);
   fs.writeFileSync(fn, content);
 };
 
 const saveInteraction = async function (
   requestId: string,
+  hist: gh.Message[],
   pmpt: string,
   response: string
 ): Promise<void> {
   if (!Config.saveInteractions) {
     return;
   }
-  const content = `# Prompt\n\n${pmpt}\n\n# Response\n\n${response}`;
-  await saveFile(requestId, `${Date.now()}-interaction.md`, content);
+  let content = [
+    "# History",
+    hist.map((hist) => {
+      return hist.role + "::" + "\n" + hist.content;
+    }),
+    "# Prompt",
+    pmpt,
+    "# Response",
+    response,
+  ];
+  await saveFile(
+    requestId,
+    `${Date.now()}-interaction.md`,
+    content.join("\n\n")
+  );
   return;
 };
 
 export function extractCodeFromResponse(res: string): string[] {
-  console.log("extracting code from message");
+  log.info("extracting code from message");
   const diffCodeBlockRegex = /```(?:\w+\n)?([\s\S]*?)```/g;
   const codeBlocks: string[] = [];
   let match: RegExpExecArray | null;
@@ -163,9 +177,9 @@ export const mergeDiff = (original: string, diff: string): string => {
 export const mergeDiffWDmp = (original: string, diff: string): string => {
   diff = removeFileHeaders(diff);
   const patch = dmp.patch_fromText(diff);
-  console.log(patch);
+  log.info(patch);
   const [res, status] = dmp.patch_apply(patch, original);
-  console.log(status);
+  log.info(status);
 
   return res;
 };
@@ -175,7 +189,7 @@ export const mergeDiffWDiffLib = function (
   diff: string
 ): string {
   const patches = Diff.parsePatch(diff);
-  console.log(patches);
+  log.info(patches);
   let patchedContent = original;
   const res = Diff.applyPatch(original, patches[0]);
   if (res) {
@@ -200,8 +214,8 @@ export const mergeDiffWDiffLib = function (
 };
 
 export async function callEdit(pmpt: string, myInput: string): Promise<string> {
-  console.log("calling edit with", pmpt);
-  console.log("input", myInput);
+  log.info(`calling edit with ${pmpt}`);
+  log.info(`input ${myInput}`);
   const res = await openai.createEdit({
     model: "code-davinci-edit-001",
     input: myInput,
@@ -236,13 +250,14 @@ function applyFileHeader(fileContent: utils.FileContent): string {
 
 export async function createEditWithChat(
   job: je.ExecutionJob,
-  chatHistory: utils.Message[]
+  chatHistory: gh.Message[]
 ): Promise<CodeEdit> {
   log.info(`Creating edit`);
   chatHistory = chatHistory || [];
   //const deps = await getCachedDeps(job.target);
   //log.info(`Got deps`);
   let action = [];
+  let deps: string[] = [];
   if (job.targets.length == 1) {
     // TODO: only grab first file
     const fileContent = await utils.getFileFromUrl(job.targets[0]);
@@ -275,6 +290,7 @@ export async function createEditWithChat(
       job.id,
       action.join("\n"),
       chatHistory,
+      deps,
       ChatType.Code
     );
     const cleanRes = extractCodeFromResponse(res);
@@ -282,10 +298,9 @@ export async function createEditWithChat(
       throw "No code returned from chat";
     }
 
-    console.log(`Found ${cleanRes.length} code blocks`);
+    log.info(`Found ${cleanRes.length} code blocks`);
 
     const body = cleanRes[0];
-    await saveFile(job.id, "mergedFile.md", body);
 
     return {
       fileContent,
@@ -323,53 +338,4 @@ export async function createEdit(job: je.ExecutionJob): Promise<CodeEdit> {
     job,
     body: merged,
   };
-}
-
-export async function generatePseudocode(
-  description: string,
-  files: string[],
-  lines: number[],
-  repository: any
-): Promise<string> {
-  const fileContentsPromises = files.map((filePath) =>
-    octokit.rest.repos.getContent({
-      owner: repository.owner.login,
-      repo: repository.name,
-      path: filePath,
-    })
-  );
-
-  const fileContentsResponses = await Promise.all(fileContentsPromises);
-  const fileContents = fileContentsResponses.map((response: any) =>
-    Buffer.from(response.data.content, "base64").toString()
-  );
-
-  let pmptArray = [];
-  pmptArray.push(
-    `Write instructions on which files to change and the pseudocode changes someone needs to submit as a pull request to accompish this task:\n\n${description}`
-  );
-  if (files.length > 0) {
-    pmptArray.push("\n\nRelevant files and lines:\n");
-    const fileLinesText = files.map(
-      (file, index) => `${file}: line ${lines[index]}\n${fileContents[index]}`
-    );
-    pmptArray = pmptArray.concat(fileLinesText);
-  }
-  const pmpt = pmptArray.join("\n");
-
-  return await callChat(uuidv4(), pmpt, []);
-}
-
-export async function postComment(
-  repository: any,
-  issue: any,
-  commentBody: string
-): Promise<void> {
-  //console.log("POSTING COMMENT", commentBody);
-  await octokit.rest.issues.createComment({
-    owner: repository.owner.login,
-    repo: repository.name,
-    issue_number: issue.number,
-    body: commentBody,
-  });
 }
