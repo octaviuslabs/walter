@@ -2,6 +2,19 @@ import * as moo from "moo";
 import { v4 as uuidv4 } from "uuid";
 import * as utils from "./utils";
 
+/**
+ * @module job-interpreter
+ */
+
+/**
+ * ExecutionJob interface represents the structure of an execution job.
+ *
+ * @class ExecutionJob
+ * @property {String} id - A unique identifier for the execution job
+ * @property {String} [keyword] - An optional keyword for the execution job
+ * @property {String[]} targets - An array of target URLs for the execution job
+ * @property {String} action - The action to be performed for the execution job
+ */
 export interface ExecutionJob {
   id: string;
   keyword?: string;
@@ -17,6 +30,13 @@ const lexer = moo.compile({
   ws: { match: /[ \t]+/, lineBreaks: false },
 });
 
+/**
+ * Parses a given program string and returns an array of ExecutionJob objects.
+ *
+ * @method parseCommentForJobs
+ * @param {String} program - The program string to be parsed
+ * @return {ExecutionJob[]} - An array of ExecutionJob objects
+ */
 export function parseCommentForJobs(program: string): ExecutionJob[] {
   //console.log("lexing", program);
   lexer.reset(program);
@@ -59,6 +79,13 @@ export function parseCommentForJobs(program: string): ExecutionJob[] {
   return executionJobs;
 }
 
+/**
+ * Parses a given free-text string and returns an ExecutionJob object.
+ *
+ * @method parseFreeTextForJob
+ * @param {String} inStr - The free-text string to be parsed
+ * @return {ExecutionJob} - An ExecutionJob object
+ */
 export function parseFreeTextForJob(inStr: string): ExecutionJob {
   const urls = utils.extractUrls(inStr);
 
