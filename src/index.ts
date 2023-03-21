@@ -170,6 +170,9 @@ async function processEvent(event: any) {
           repository,
           issue.number
         );
+        commentHistory = commentHistory.filter(
+          (comment) => parseComment(comment).type !== "status"
+        );
         const job = parseFreeTextForJob(action.body);
         const jobs = [job];
 
