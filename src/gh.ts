@@ -1,6 +1,7 @@
 import { Octokit } from "@octokit/rest";
 import Config from "./config";
 import Log from "./log";
+import * as ts from 'typescript';
 
 export interface IGitHubFileFetcher {
   repoOwner: string;
@@ -41,6 +42,32 @@ export class GitHubFileFetcher implements IGitHubFileFetcher {
     } else {
       throw new Error(`Could not fetch file content for: ${filePath}`);
     }
+  }
+
+  async fetchAndParseFunctions(filePath: string): Promise<void> {
+    // Fetch the TypeScript file content
+    const fileContent = await this.getFileContent(filePath);
+
+    // Parse the fetched TypeScript file content to extract all functions
+    const functions = this.parseFunctions(fileContent);
+
+    // Log the functions
+    console.log(functions);
+  }
+
+  parseFunctions(fileContent: string): Array<ts.FunctionDeclaration | ts.ArrowFunction | ts.MethodDeclaration> {
+    const functions = [];
+    const sourceFile = ts.createSourceFile('temp.ts', fileContent, ts.ScriptTarget.Latest, true);
+
+    const visitNode = (node: ts.Node) => {
+      if (ts.isFunctionDeclaration(node) || ts.isArrowFunction(node) || ts.isMethodDeclaration(node)) {
+        functions.push(node);
+      }
+      ts.forEachChild(node, visitNode);
+    };
+
+    ts.forEachChild(sourceFile, visitNode);
+    return functions;
   }
 }
 
