@@ -18,11 +18,25 @@ export async function getCommentHistory(
   repository: Repository,
   issueNumber: number
 ): Promise<Message[]> {
+  // Fetch the issue details
+  const issueResponse = await octokit.rest.issues.get({
+    owner: repository.owner.login,
+    repo: repository.name,
+    issue_number: issueNumber,
+  });
+
+  // Fetch the issue comments
   const commentsResponse = await octokit.rest.issues.listComments({
     owner: repository.owner.login,
     repo: repository.name,
     issue_number: issueNumber,
   });
+
+  // Include the issue body as the first comment in the comment history
+  const issueBody: Message = {
+    role: issueResponse.data.user?.login === Config.githubBotName ? "assistant" : "user",
+    content: issueResponse.data.body || "",
+  };
 
   const commentHistory: Message[] = commentsResponse.data
     .filter((comment) => comment.user !== null && comment.body !== null)
@@ -31,7 +45,8 @@ export async function getCommentHistory(
       content: comment.body || "",
     }));
 
-  return commentHistory;
+  // Add the issue body to the beginning of the comment history
+  return [issueBody, ...commentHistory];
 }
 
 export interface FileContent {
@@ -60,7 +75,7 @@ export const getFileFromUrl = async (url: string): Promise<FileContent> => {
 
   let focus: string | undefined;
   if (parsedUrl.startLine) {
-    // TODO could be good to fuzzily get the end rather then going to end of time
+    // TODO could be good to fuzzily get the end rather than going to the end of time
     const lines = body.split("\n");
     const endLine = parsedUrl.endLine || lines.length - 1;
 
