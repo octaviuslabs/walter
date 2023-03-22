@@ -79,9 +79,5 @@ function isBotTask(
     return true;
   }
 
-  if (issue.labels == undefined || issue.labels?.length == 0) {
-    return false;
-  }
-
-  return issue.labels.some((label: any) => label.name === Config.botTaskLabel);
+  return false;
 }
