@@ -48,7 +48,7 @@ export async function processEvent(event: any) {
     return;
   }
 
-  if (isBotTask(issue, repository.full_name, comment.user.login)) {
+  if (isBotTask(issue, repository.full_name, comment.user.login, comment)) {
     await gh.postIssueComment(
       event.payload.repository,
       event.payload.issue,
@@ -58,10 +58,11 @@ export async function processEvent(event: any) {
   }
 }
 
-export function isBotTask(
+function isBotTask(
   issue: oct.Issue,
   repository: string,
-  user: string
+  user: string,
+  comment: oct.Comment
 ): boolean {
   if (user == undefined) {
     throw "user can not be undefined";
@@ -71,6 +72,11 @@ export function isBotTask(
     !Config.supportedUsers.includes(user)
   ) {
     return false;
+  }
+
+  const botMention = `@${Config.githubBotName}`;
+  if (comment.body.includes(botMention)) {
+    return true;
   }
 
   if (issue.labels == undefined || issue.labels?.length == 0) {
