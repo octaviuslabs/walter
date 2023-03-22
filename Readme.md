@@ -42,40 +42,44 @@ To submit a task, write it up in the issues. We (you I and @imwalterbot) will wo
 
 WALTER was designed and built using a combination of GPT-4, the GitHub API, and a typical senior developer/junior developer workflow. It leverages OpenAI's GPT-4 model for generating code and solutions, while the GitHub API enables seamless integration with your repository. The senior developer/junior developer workflow helps guide the AI in providing relevant and useful solutions based on user input.
 
-## Q&A Section
+## FAQ
 
-### Q1: Is WALTER just a wrapper around GPT-4?
+### Q: Is WALTER just a wrapper around GPT-4?
 
 Yes and no. WALTER uses OpenAI's GPT-4 model to generate code and solutions, but it's a mashup of the GPT-4 API, the GitHub API, and the typical senior developer/junior developer workflow. This combination allows WALTER to provide a more comprehensive and streamlined development experience.
 
-### Q2: Can WALTER work with other programming languages besides TypeScript?
+### Q: Can WALTER work with other programming languages besides TypeScript?
 
 Currently, WALTER is designed to work with TypeScript. However, we are actively working on expanding support for other programming languages in the future.
 
-### Q3: Can I run WALTER on my own repo?
+### Q: Can I run WALTER on my own repo?
 
 Yes, you can run WALTER on your own repository using the provided Dockerfile. More instructions on building and hosting WALTER yourself will be provided soon. This will allow you to have a fully customized AI development assistant for your specific projects.
 
-### Q4: How is WALTER bootstrapped? Was it designed and built primarily by GPT-4?
+### Q: How is WALTER bootstrapped? Was it designed and built primarily by GPT-4?
 
 WALTER is bootstrapped using a combination of GPT-4, the GitHub API, and a typical senior developer/junior developer workflow. This combination allows WALTER to provide relevant and useful solutions based on user input, while also integrating seamlessly with your GitHub repository.
 
-### Q5: How can I contribute to WALTER's development?
+### Q: How can I contribute to WALTER's development?
 
-We welcome contributions to WALTER! Please check out the [CONTRIBUTING.md](https://github.com/octaviuslabs/walter/issues/CONTRIBUTING.md) file for guidelines on how to contribute to this project.
+We welcome contributions to WALTER! Just open up an issue (or pull request).
 
-### Q6: How does WALTER handle dependencies in the code?
+### Q: How does WALTER handle dependencies in the code?
 
 We are currently working on the ability to include type dependencies in prompts and finding the minimal set of dependencies for a change. This will help WALTER better understand and work with your codebase.
 
-### Q7: Can WALTER create new files or edit multiple files at once?
+### Q: Can WALTER create new files or edit multiple files at once?
 
 We are actively working on adding support for multi-file edits, creating new files, and authoring new multi-file features based on user chat/specification.
 
-### Q8: Does WALTER provide any testing or security analysis features?
+### Q: Does WALTER provide any testing or security analysis features?
 
 We are developing features for auto test generation, automated testing, and code security analysis. These features will allow WALTER to generate test cases based on changes made in pull requests, perform security checks, and suggest fixes to improve the overall security of your project.
 
-### Q9: Can WALTER generate or update documentation for my project?
+### Q: Can WALTER generate or update documentation for my project?
 
 Yes, WALTER is capable of generating and updating documentation for your project. It can automatically generate and update documentation based on the code changes, keeping your project's documentation up-to-date with the latest code. This feature helps maintain the quality and accuracy of your project's documentation, making it easier for other developers to understand and contribute to your project.
+
+### Q: Did WALTER write these docs?
+
+For the most part yes. See [this issue](https://github.com/octaviuslabs/walter/issues/105) and (this issue)[https://github.com/octaviuslabs/walter/issues/107]
