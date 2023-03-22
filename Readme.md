@@ -1,4 +1,4 @@
-![WALTER](https://user-images.githubusercontent.com/1569744/226808875-02ce6b84-2c04-48cc-9fe3-5c95c2dc6f2a.png)
+<img src="https://user-images.githubusercontent.com/1569744/226808875-02ce6b84-2c04-48cc-9fe3-5c95c2dc6f2a.png" width="200" align="center" />
 
 # WALTER - An AI Junior Developer
 
