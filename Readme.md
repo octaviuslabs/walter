@@ -34,6 +34,7 @@ That doesnt mean you can't submit a task for something you think WALTER should d
 To submit a task, write it up in the issues. We (you I and @imwalterbot) will work together to implement the change that you are hoping to see. I have no idea how this is going to go but lets see.
 
 ## Limitations
+- Only supports Typescript currently (sorry Rust fans). We will be adding other languages soon!
 - Currently WALTER is only capable of editing one file at a time. Additionally only one file can be provided as context. We (WALTER and @jsfour) are actively working on pulling in broader dependencies but the ~8k token limit on the model is making that dificult. We have some [ideas](https://github.com/octaviuslabs/walter/issues/74) but this is still under development.
 - WALTER can not create files (yet)
 - Non issue comments (comments in pull requests for example) are ignored (for now)
