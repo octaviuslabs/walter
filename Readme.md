@@ -1,6 +1,6 @@
 <img src="https://user-images.githubusercontent.com/1569744/226808875-02ce6b84-2c04-48cc-9fe3-5c95c2dc6f2a.png" width="200" align="center" />
 
-# WALTER - AI Junior Developer
+# WALTER - AI GitHub Code Bot
 
 WALTER is an AI-powered software development assistant built right into GitHub so it can act as your junior developer. The bot helps you design and implement solutions using GitHub issues and pull requests.
 
