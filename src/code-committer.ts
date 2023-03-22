@@ -36,11 +36,23 @@ async function generateCode(
   return res.data.choices[0].message?.content;
 }
 
-async function createBranch(repository: Repository): Promise<string> {
-  const baseBranch = await octokit.rest.repos.getBranch({
+async function getPrimaryBranch(repository: Repository): Promise<string> {
+  const response = await octokit.rest.repos.get({
     owner: repository.owner.login,
     repo: repository.name,
-    branch: "main",
+  });
+
+  return response.data.default_branch;
+}
+
+async function createBranch(
+  repository: Repository,
+  primaryBranch: string
+): Promise<string> {
+  const baseBranch = await octokit.rest.git.getRef({
+    owner: repository.owner.login,
+    repo: repository.name,
+    ref: `heads/${primaryBranch}`,
   });
 
   const newBranchName = `bot-generated-code-${Date.now()}`;
@@ -142,10 +154,11 @@ export const createNewPullRequest = async (
   issueNumber?: number
 ) => {
   console.log("creating branch");
-  const newBranch = await createBranch(repo);
-  console.log("comitting");
+  const primaryBranch = await getPrimaryBranch(repo);
+  const newBranch = await createBranch(repo, primaryBranch);
+  console.log("committing");
   await commitCode(repo, newBranch, result);
 
   console.log("creating pull request");
-  await createPullRequest(repo, newBranch, issueNumber);
+  await createPullRequest(repo, newBranch, issueNumber, primaryBranch);
 };
