@@ -62,7 +62,7 @@ function isBotTask(
   issue: oct.Issue,
   repository: string,
   user: string,
-  comment: oct.Comment
+  comment: oct.IssueComment
 ): boolean {
   if (user == undefined) {
     throw "user can not be undefined";
