@@ -43,8 +43,7 @@ export const getFileFromUrl = async (url: string): Promise<FileContent> => {
 };
 
 export const extractUrls = (textBody: string): ParsedGitHubURL[] => {
-  const rx =
-    /(?:(?:https?|ftp|file):\/\/|www\.|ftp\.)(?:\([-A-Z0-9+&@#\/%=~_|$?!:,.]*\)|[-A-Z0-9+&@#\/%=~_|$?!:,.])*(?:\([-A-Z0-9+&@#\/%=~_|$?!:,.]*\)|[A-Z0-9+&@#\/%=~_|$])/gim;
+  const rx = /(?:https?:\/\/)?(?:www\.)?github\.com[-A-Z0-9+&@#\/%=~_|$?!:,.]*\)?(?:[-A-Z0-9+&@#\/%=~_|$?!:,.])*(?:\([-A-Z0-9+&@#\/%=~_|$?!:,.]*\)|[A-Z0-9+&@#\/%=~_|$])/gim;
 
   const matches = textBody.match(rx) || [];
   const out = [];
