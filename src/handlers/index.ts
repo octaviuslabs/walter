@@ -32,6 +32,43 @@ async function routeEvent(event: any): Promise<void> {
   }
 }
 
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function retryOnError(attempts, processingFunction, errorCallback, successCallback) {
+  try {
+    await processingFunction();
+    successCallback();
+  } catch (error) {
+    if (attempts > 0) {
+      const backoffTime = Math.pow(2, 3 - attempts) * 1000;
+      await sleep(backoffTime);
+      await retryOnError(attempts - 1, processingFunction, errorCallback, successCallback);
+    } else {
+      errorCallback(error);
+    }
+  }
+}
+
+async function processEventWithRetry(event) {
+  await retryOnError(
+    3,
+    async () => await processEvent(event),
+    (error) => {
+      gh.postIssueComment(
+        event.payload.repository,
+        event.payload.issue,
+        [`> ${event.payload.comment.body} `, "Error processing request. Please try again later."].join("\n\n")
+      );
+      Log.error(`Error processing event ${event.id}: ${error}`);
+    },
+    () => {
+      Log.info(`Successfully processed event ${event.id}`);
+    }
+  );
+}
+
 export async function processEvent(event: any) {
   Log.info(`Processing Event ${event.id}`);
   if (event.payload.action != "created") {
