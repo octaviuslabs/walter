@@ -2,6 +2,11 @@
 
 WALTER is an AI-powered software development assistant that helps you design and implement solutions using GitHub issues and pull requests. It supports TypeScript and streamlines the development process by allowing you to communicate with the AI via issue comments.
 
+## Use Cases
+- Quickly add additional logic to functions directly: https://github.com/octaviuslabs/walter/issues/102
+- Plan and execute pieces of complex ideas: https://github.com/octaviuslabs/walter/issues/95
+- Quickly add documentation: https://github.com/octaviuslabs/walter/issues/78
+
 ## Workflow
 
 1. Open an issue on a repository.
@@ -22,7 +27,7 @@ WALTER is an AI-powered software development assistant that helps you design and
 - [ ] Find dependent files and update them as well
 - [ ] Automated Testing: The bot can generate test cases based on the changes made in the pull request.
 - [ ] Code Security Analysis: The bot can perform security checks on the code changes, identifying potential vulnerabilities and suggesting fixes to improve the overall security of the project.
-- [ ] Documentation Generation: The bot can automatically generate and update documentation based on the code changes, keeping the documentation up-to-date with the latest code.
+- [X] Documentation Generation: The bot can automatically generate and update documentation
 
 ## Contributing
 
