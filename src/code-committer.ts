@@ -49,10 +49,10 @@ async function createBranch(
   repository: Repository,
   primaryBranch: string
 ): Promise<string> {
-  const baseBranch = await octokit.rest.git.getRef({
+  const baseBranch = await octokit.rest.repos.getBranch({
     owner: repository.owner.login,
     repo: repository.name,
-    ref: `heads/${primaryBranch}`,
+    branch: primaryBranch,
   });
 
   const newBranchName = `bot-generated-code-${Date.now()}`;
@@ -162,3 +162,4 @@ export const createNewPullRequest = async (
   console.log("creating pull request");
   await createPullRequest(repo, newBranch, issueNumber, primaryBranch);
 };
+
